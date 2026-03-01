@@ -29,5 +29,14 @@ services:
     ports:
       - '8000:8000'
 
+  # Frontend: run `cd frontend && npm run dev` for local development.
+  # Docker build for frontend will be added in Phase 6 (Deploy).
+  # frontend:
+  #   build: ./frontend
+  #   ports:
+  #     - '5173:5173'
+  #   depends_on:
+  #     - backend
+
 volumes:
   pgdata:

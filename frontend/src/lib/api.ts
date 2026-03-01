@@ -6,6 +6,8 @@ import type {
   Chain,
   PaginatedResponse,
   ListingsQuery,
+  NewListingPayload,
+  SubmitResponse,
 } from '../types/api';
 
 export class ApiError extends Error {
@@ -58,4 +60,17 @@ export async function fetchTags(): Promise<Tag[]> {
 
 export async function fetchChains(): Promise<Chain[]> {
   return fetchJson<Chain[]>('/api/chains');
+}
+
+export async function submitListing(payload: NewListingPayload): Promise<SubmitResponse> {
+  const res = await fetch(`${API_BASE_URL}/api/listings`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ error: res.statusText })) as { error?: string };
+    throw new ApiError(res.status, body.error ?? res.statusText);
+  }
+  return res.json() as Promise<SubmitResponse>;
 }

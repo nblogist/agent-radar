@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import type { PublicListing } from '../../types/api';
 
 interface DetailSidebarProps {
@@ -108,13 +109,12 @@ export default function DetailSidebar({ listing }: DetailSidebarProps) {
         <p className="text-sm text-gray-400 mb-4">
           Submit your AI agent to the directory and reach a wider audience.
         </p>
-        <button
-          className="bg-primary w-full py-2.5 rounded-lg font-semibold cursor-not-allowed opacity-70 transition-all"
-          title="Coming in Phase 4"
-          disabled
+        <Link
+          to="/submit"
+          className="bg-primary hover:scale-[1.05] active:scale-95 transition-all w-full py-2.5 rounded-lg font-semibold inline-flex items-center justify-center"
         >
           Submit Agent
-        </button>
+        </Link>
       </div>
     </div>
   );

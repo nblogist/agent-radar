@@ -42,12 +42,14 @@ export default function Header() {
             >
               Rankings
             </span>
-            <span
-              className="text-gray-500 cursor-not-allowed select-none"
-              title="Coming Soon"
+            <NavLink
+              to="/submit"
+              className={({ isActive }) =>
+                isActive ? 'text-primary' : 'text-gray-300 hover:text-white transition-colors'
+              }
             >
               Submit
-            </span>
+            </NavLink>
           </nav>
 
           {/* Desktop search */}
@@ -66,12 +68,12 @@ export default function Header() {
 
           {/* Submit CTA + mobile hamburger */}
           <div className="flex items-center gap-3">
-            <span
-              className="hidden md:inline-flex items-center bg-primary/80 cursor-not-allowed opacity-70 rounded-lg px-4 py-2 text-sm font-semibold select-none"
-              title="Coming Soon — agent submission opens in Phase 4"
+            <Link
+              to="/submit"
+              className="hidden md:inline-flex items-center bg-primary hover:scale-[1.05] active:scale-95 transition-all rounded-lg px-4 py-2 text-sm font-semibold text-white"
             >
               Submit Agent
-            </span>
+            </Link>
 
             {/* Hamburger */}
             <button
@@ -98,7 +100,15 @@ export default function Header() {
             Directory
           </NavLink>
           <span className="text-gray-500 cursor-not-allowed select-none" title="Coming Soon">Rankings</span>
-          <span className="text-gray-500 cursor-not-allowed select-none" title="Coming Soon">Submit</span>
+          <NavLink
+            to="/submit"
+            onClick={() => setMobileOpen(false)}
+            className={({ isActive }) =>
+              isActive ? 'text-primary font-semibold' : 'text-gray-300 hover:text-white transition-colors'
+            }
+          >
+            Submit
+          </NavLink>
 
           {/* Mobile search */}
           <form onSubmit={handleSearch} className="flex items-center gap-2">

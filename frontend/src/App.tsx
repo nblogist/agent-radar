@@ -4,6 +4,7 @@ import Layout from './components/layout/Layout';
 import HomePage from './pages/HomePage';
 import BrowsePage from './pages/BrowsePage';
 import ListingDetailPage from './pages/ListingDetailPage';
+import SubmitPage from './pages/SubmitPage';
 import NotFoundPage from './pages/NotFoundPage';
 
 const queryClient = new QueryClient({
@@ -24,6 +25,7 @@ export default function App() {
             <Route path="/" element={<HomePage />} />
             <Route path="/browse" element={<BrowsePage />} />
             <Route path="/agents/:slug" element={<ListingDetailPage />} />
+            <Route path="/submit" element={<SubmitPage />} />
             <Route path="*" element={<NotFoundPage />} />
           </Route>
         </Routes>

@@ -84,3 +84,27 @@ export interface ListingsQuery {
   page?: number;
   per_page?: number;
 }
+
+// --- Submit Flow Types ---
+
+export interface NewListingPayload {
+  name: string;
+  short_description: string;
+  description: string;
+  logo_url?: string;
+  website_url: string;
+  github_url?: string;
+  docs_url?: string;
+  api_endpoint_url?: string;
+  contact_email: string;
+  categories: string[];  // UUID strings
+  tags: string[];
+  chains: string[];      // UUID strings
+}
+
+export interface SubmitResponse {
+  id: string;
+  slug: string;
+  status: string;
+  submitted_at: string;
+}
