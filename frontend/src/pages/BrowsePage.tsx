@@ -196,7 +196,7 @@ export default function BrowsePage() {
                   className="bg-dark-surface2/50 border border-dark-border rounded-xl p-5 hover:border-primary/50 hover:bg-dark-surface2 transition-all group flex flex-col"
                 >
                   <div className="mb-4">
-                    <ListingLogo name={listing.name} logoUrl={listing.logo_url} size="size-14" textSize="text-lg" />
+                    <ListingLogo name={listing.name} logoUrl={listing.logo_url} size="size-16" textSize="text-xl" />
                   </div>
 
                   <div className="flex-1">

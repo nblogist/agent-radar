@@ -99,7 +99,7 @@ export default function AdminDashboard() {
     <div className="p-8">
       <div className="mb-8">
         <h2 className="text-3xl font-black tracking-tight mb-2">Submissions Management</h2>
-        <p className="text-slate-400">Review and moderate AI agent submissions for the directory. Priority on CKB cost-efficient agents.</p>
+        <p className="text-slate-400">Review and moderate submissions for the directory — agents, tools, protocols, and infrastructure.</p>
       </div>
 
       {/* Stats Grid — 3 cards matching mockup */}

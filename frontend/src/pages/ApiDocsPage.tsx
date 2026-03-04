@@ -75,7 +75,7 @@ export default function ApiDocsPage() {
       <div className="mb-12">
         <h1 className="text-4xl font-bold tracking-tight mb-4">API Documentation</h1>
         <p className="text-slate-400 text-lg max-w-3xl">
-          {APP_NAME} provides a RESTful API for discovering and submitting AI agent listings.
+          {APP_NAME} provides a RESTful API for discovering and submitting listings — agents, tools, protocols, and infrastructure.
           All responses are JSON. The base URL is <code className="text-primary font-mono text-sm">{baseUrl}/api</code>.
         </p>
       </div>

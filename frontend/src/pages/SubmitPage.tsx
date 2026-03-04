@@ -28,6 +28,7 @@ export default function SubmitPage() {
   const [suggestedChains, setSuggestedChains] = useState<string[]>([]);
   const [chainSuggestionInput, setChainSuggestionInput] = useState('');
   const [chainSuggestionError, setChainSuggestionError] = useState('');
+  const [logoError, setLogoError] = useState('');
   const [formError, setFormError] = useState('');
   const [showPreview, setShowPreview] = useState(false);
 
@@ -264,12 +265,33 @@ export default function SubmitPage() {
                     Logo URL <span className="text-slate-400 font-normal ml-1 text-xs">(Optional)</span>
                   </label>
                   <input
-                    className="w-full bg-dark-bg border-white/10 rounded-xl px-4 py-3 focus:ring-primary focus:border-primary text-sm text-slate-100 placeholder-slate-500 border"
+                    className={`w-full bg-dark-bg border rounded-xl px-4 py-3 focus:ring-primary focus:border-primary text-sm text-slate-100 placeholder-slate-500 ${logoError ? 'border-red-500/50' : 'border-white/10'}`}
                     placeholder="https://example.com/logo.png"
                     type="url"
                     value={logoUrl}
-                    onChange={e => setLogoUrl(e.target.value)}
+                    onChange={e => {
+                      const url = e.target.value;
+                      setLogoUrl(url);
+                      setLogoError('');
+                      if (url && !url.match(/\.(png|jpg|jpeg|svg|webp)(\?.*)?$/i) && !url.match(/^https?:\/\/.+/)) {
+                        setLogoError('URL must point to a PNG, JPG, SVG, or WebP image.');
+                      }
+                    }}
+                    onBlur={() => {
+                      if (logoUrl && !logoUrl.match(/\.(png|jpg|jpeg|svg|webp)(\?.*)?$/i)) {
+                        setLogoError('URL should end in .png, .jpg, .svg, or .webp for best results.');
+                      }
+                    }}
                   />
+                  {logoError && (
+                    <p className="text-amber-500 text-xs mt-1.5 flex items-center gap-1">
+                      <span className="material-symbols-outlined text-xs">warning</span>
+                      {logoError}
+                    </p>
+                  )}
+                  <p className="text-slate-500 text-[10px] mt-1.5 leading-relaxed">
+                    Square icon recommended (min 128x128px). Accepted formats: PNG, JPG, SVG, WebP. Max 500KB.
+                  </p>
                 </div>
                 <div className="col-span-2 md:col-span-1">
                   <label className="block text-sm font-bold mb-2 text-slate-300">

@@ -32,21 +32,21 @@ interface ListingLogoProps {
 export default function ListingLogo({ name, logoUrl, size = 'w-12 h-12', textSize = 'text-sm', rounded = 'rounded-lg' }: ListingLogoProps) {
   const [imgError, setImgError] = useState(false);
 
+  // Real logo: clean white box with subtle border — works for any logo color
   if (logoUrl && !imgError) {
     return (
-      <div className={`${size} ${rounded} bg-gradient-to-br ${getGradient(name)} p-0.5 flex-shrink-0`}>
-        <div className={`w-full h-full ${rounded} bg-dark-bg flex items-center justify-center overflow-hidden`}>
-          <img
-            className="w-full h-full object-cover"
-            src={logoUrl}
-            alt={name}
-            onError={() => setImgError(true)}
-          />
-        </div>
+      <div className={`${size} ${rounded} ring-1 ring-white/10 flex items-center justify-center overflow-hidden flex-shrink-0`}>
+        <img
+          className="w-full h-full object-contain"
+          src={logoUrl}
+          alt={name}
+          onError={() => setImgError(true)}
+        />
       </div>
     );
   }
 
+  // No logo: gradient with initials
   return (
     <div className={`${size} ${rounded} bg-gradient-to-br ${getGradient(name)} flex items-center justify-center flex-shrink-0`}>
       <span className={`font-bold text-white ${textSize}`}>{getInitials(name)}</span>

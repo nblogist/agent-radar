@@ -35,7 +35,7 @@ export default function HomePage() {
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(55,19,236,0.1),transparent)] pointer-events-none" />
         <div className="max-w-4xl mx-auto text-center relative z-10">
           <span className="inline-block px-4 py-1.5 rounded-full bg-primary/10 text-primary text-xs font-bold tracking-widest uppercase mb-6 border border-primary/20">
-            The Next Evolution of AI
+            AI-First Application Directory
           </span>
 
           <h1 className="text-5xl lg:text-7xl font-bold tracking-tight mb-8 neon-glow">
@@ -43,7 +43,7 @@ export default function HomePage() {
           </h1>
 
           <p className="text-lg text-slate-400 mb-10 max-w-2xl mx-auto">
-            Track, analyze, and discover the most popular AI agents across the decentralized web. The leading directory for the agentic economy.
+            Discover and explore the most popular AI agents, tools, and infrastructure across the decentralized web. An open directory for the agentic economy.
           </p>
 
           {/* Search bar */}
@@ -140,7 +140,7 @@ export default function HomePage() {
                       <td className="px-6 py-5 font-bold text-slate-400">{idx + 1}</td>
                       <td className="px-6 py-5">
                         <div className="flex items-center gap-4">
-                          <ListingLogo name={listing.name} logoUrl={listing.logo_url} />
+                          <ListingLogo name={listing.name} logoUrl={listing.logo_url} size="size-14" textSize="text-lg" />
                           <div>
                             <div className="font-bold text-lg group-hover:text-primary transition-colors text-white flex items-center gap-2">
                               {listing.name}

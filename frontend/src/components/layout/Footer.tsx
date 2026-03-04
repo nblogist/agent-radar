@@ -11,7 +11,7 @@ export default function Footer() {
             <Link to="/" className="text-lg font-bold">{APP_NAME}</Link>
           </div>
           <p className="text-slate-500 text-sm leading-relaxed">
-            The global leader in AI agent analytics. Discover, track, and interact with the most promising agents in the new economy.
+            Discover and explore AI agents, tools, and infrastructure across the decentralized web. An open directory for the agentic economy.
           </p>
           <div className="flex gap-4 mt-6">
             <a href="#" className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center hover:bg-primary hover:text-white transition-colors">
