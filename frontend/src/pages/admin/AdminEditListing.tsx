@@ -164,7 +164,19 @@ export default function AdminEditListing() {
     );
   }
 
-  if (error || !listing) {
+  if (error) {
+    const is404 = error instanceof Error && 'status' in error && (error as { status: number }).status === 404;
+    return (
+      <div className="p-8 text-center py-20">
+        <span className="material-symbols-outlined text-4xl text-slate-600 mb-4">{is404 ? 'error_outline' : 'cloud_off'}</span>
+        <h2 className="text-xl font-bold mb-2">{is404 ? 'Listing Not Found' : 'Failed to Load'}</h2>
+        <p className="text-slate-400 text-sm mb-4">{is404 ? '' : 'Something went wrong. Please try again.'}</p>
+        <Link to="/admin/dashboard" className="text-primary hover:underline text-sm">Back to Listings</Link>
+      </div>
+    );
+  }
+
+  if (!listing) {
     return (
       <div className="p-8 text-center py-20">
         <span className="material-symbols-outlined text-4xl text-slate-600 mb-4">error_outline</span>

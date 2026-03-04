@@ -28,13 +28,14 @@ export default function AdminDashboard() {
   const [page, setPage] = useState(1);
   const [rejectTarget, setRejectTarget] = useState<{ id: string; name: string } | null>(null);
   const [rejectNote, setRejectNote] = useState('');
+  const [actionError, setActionError] = useState('');
 
-  const { data: stats, isLoading: statsLoading } = useQuery({
+  const { data: stats, isLoading: statsLoading, error: statsError } = useQuery({
     queryKey: ['adminStats'],
     queryFn: () => api.admin.stats(token),
   });
 
-  const { data, isLoading: listingsLoading } = useQuery({
+  const { data, isLoading: listingsLoading, error: listingsError } = useQuery({
     queryKey: ['adminListings', statusFilter, adminSearch, page],
     queryFn: () => api.admin.listings.list(token, { status: statusFilter, search: adminSearch, page, per_page: 10 }),
   });
@@ -42,12 +43,18 @@ export default function AdminDashboard() {
   const listings = data?.data ?? [];
   const meta = data?.meta ?? { page: 1, per_page: 10, total: 0, total_pages: 0 };
 
+  const onMutationError = (err: Error) => {
+    setActionError(err.message || 'Action failed. Please try again.');
+    setTimeout(() => setActionError(''), 5000);
+  };
+
   const approveMutation = useMutation({
     mutationFn: (id: string) => api.admin.listings.approve(token, id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['adminListings'] });
       queryClient.invalidateQueries({ queryKey: ['adminStats'] });
     },
+    onError: onMutationError,
   });
 
   const rejectMutation = useMutation({
@@ -58,6 +65,7 @@ export default function AdminDashboard() {
       setRejectTarget(null);
       setRejectNote('');
     },
+    onError: onMutationError,
   });
 
   const deleteMutation = useMutation({
@@ -66,6 +74,7 @@ export default function AdminDashboard() {
       queryClient.invalidateQueries({ queryKey: ['adminListings'] });
       queryClient.invalidateQueries({ queryKey: ['adminStats'] });
     },
+    onError: onMutationError,
   });
 
   const toggleFeaturedMutation = useMutation({
@@ -73,6 +82,7 @@ export default function AdminDashboard() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['adminListings'] });
     },
+    onError: onMutationError,
   });
 
   // Chain suggestions
@@ -86,6 +96,7 @@ export default function AdminDashboard() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['chainSuggestions'] });
     },
+    onError: onMutationError,
   });
 
   const rejectChainMutation = useMutation({
@@ -93,6 +104,7 @@ export default function AdminDashboard() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['chainSuggestions'] });
     },
+    onError: onMutationError,
   });
 
   return (
@@ -101,6 +113,15 @@ export default function AdminDashboard() {
         <h2 className="text-3xl font-black tracking-tight mb-2">Submissions Management</h2>
         <p className="text-slate-400">Review and moderate submissions for the directory — agents, tools, protocols, and infrastructure.</p>
       </div>
+
+      {actionError && (
+        <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 text-sm flex items-center justify-between">
+          <span>{actionError}</span>
+          <button onClick={() => setActionError('')} className="text-red-400 hover:text-red-300 ml-4">
+            <span className="material-symbols-outlined text-sm">close</span>
+          </button>
+        </div>
+      )}
 
       {/* Stats Grid — 3 cards matching mockup */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
@@ -112,6 +133,10 @@ export default function AdminDashboard() {
               <div className="h-8 w-16 bg-slate-800 rounded" />
             </div>
           ))
+        ) : statsError ? (
+          <div className="col-span-3 p-6 rounded-xl border border-red-500/20 bg-red-500/5 text-center">
+            <p className="text-red-400 text-sm">Failed to load stats. Please refresh the page.</p>
+          </div>
         ) : stats ? (
           <>
             <div className="p-6 rounded-xl border border-slate-800 bg-slate-900/40">
@@ -181,7 +206,13 @@ export default function AdminDashboard() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800">
-              {listingsLoading ? (
+              {listingsError ? (
+                <tr>
+                  <td colSpan={6} className="px-6 py-12 text-center text-red-400">
+                    Failed to load listings. Please refresh the page.
+                  </td>
+                </tr>
+              ) : listingsLoading ? (
                 Array.from({ length: 5 }).map((_, i) => (
                   <tr key={i} className="animate-pulse">
                     <td className="px-6 py-4">

@@ -26,6 +26,12 @@ export default function AdminListings() {
   const [page, setPage] = useState(1);
   const [rejectTarget, setRejectTarget] = useState<{ id: string; name: string } | null>(null);
   const [rejectNote, setRejectNote] = useState('');
+  const [actionError, setActionError] = useState('');
+
+  const onMutationError = (err: Error) => {
+    setActionError(err.message || 'Action failed. Please try again.');
+    setTimeout(() => setActionError(''), 5000);
+  };
 
   const { data, isLoading } = useQuery({
     queryKey: ['adminListings', statusFilter, search, page],
@@ -38,6 +44,7 @@ export default function AdminListings() {
   const approveMutation = useMutation({
     mutationFn: (id: string) => api.admin.listings.approve(token, id),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['adminListings'] }),
+    onError: onMutationError,
   });
 
   const rejectMutation = useMutation({
@@ -47,11 +54,13 @@ export default function AdminListings() {
       setRejectTarget(null);
       setRejectNote('');
     },
+    onError: onMutationError,
   });
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => api.admin.listings.delete(token, id),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['adminListings'] }),
+    onError: onMutationError,
   });
 
   return (
@@ -60,6 +69,15 @@ export default function AdminListings() {
         <h2 className="text-3xl font-black tracking-tight mb-2">Submissions Management</h2>
         <p className="text-slate-400">Review and moderate listing submissions for the directory.</p>
       </div>
+
+      {actionError && (
+        <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 text-sm flex items-center justify-between">
+          <span>{actionError}</span>
+          <button onClick={() => setActionError('')} className="text-red-400 hover:text-red-300 ml-4">
+            <span className="material-symbols-outlined text-sm">close</span>
+          </button>
+        </div>
+      )}
 
       <div className="bg-slate-900/40 rounded-xl border border-slate-800 overflow-hidden">
         {/* Tabs + Search */}

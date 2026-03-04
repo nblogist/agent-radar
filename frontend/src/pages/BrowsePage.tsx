@@ -7,7 +7,7 @@ import ListingLogo from '../components/ListingLogo';
 import EmptyState from '../components/EmptyState';
 
 export default function BrowsePage() {
-  const { listings, meta, isLoading, filters, setFilter, clearFilters } = useListingsQuery();
+  const { listings, meta, isLoading, error, filters, setFilter, clearFilters } = useListingsQuery();
 
   const { data: categories } = useQuery({ queryKey: ['categories'], queryFn: fetchCategories });
   const { data: chains } = useQuery({ queryKey: ['chains'], queryFn: fetchChains });
@@ -168,7 +168,19 @@ export default function BrowsePage() {
           </div>
 
           {/* Cards Grid */}
-          {isLoading ? (
+          {error ? (
+            <div className="text-center py-20">
+              <span className="material-symbols-outlined text-5xl text-red-400 mb-4">cloud_off</span>
+              <h2 className="text-xl font-bold mb-2">Failed to load listings</h2>
+              <p className="text-slate-400 mb-6 text-sm">Something went wrong while fetching listings. Please try again.</p>
+              <button
+                onClick={() => window.location.reload()}
+                className="bg-primary text-white px-6 py-2.5 rounded-lg font-bold text-sm hover:bg-primary/90 transition-colors"
+              >
+                Retry
+              </button>
+            </div>
+          ) : isLoading ? (
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-6">
               {Array.from({ length: 8 }).map((_, i) => (
                 <div key={i} className="bg-dark-surface2/50 border border-dark-border rounded-xl p-5 animate-pulse">

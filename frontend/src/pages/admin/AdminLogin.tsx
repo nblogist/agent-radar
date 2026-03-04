@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAdminStore } from '../../lib/adminStore';
-import { api } from '../../lib/api';
+import { api, ApiError } from '../../lib/api';
 import { APP_NAME } from '../../lib/constants';
 
 export default function AdminLogin() {
@@ -19,8 +19,12 @@ export default function AdminLogin() {
       await api.admin.stats(token.trim());
       setStoreToken(token.trim());
       navigate('/admin/dashboard', { replace: true });
-    } catch {
-      setError('Invalid token');
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 401) {
+        setError('Invalid token');
+      } else {
+        setError('Could not reach the server. Please try again.');
+      }
     } finally {
       setLoading(false);
     }

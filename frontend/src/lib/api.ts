@@ -97,7 +97,7 @@ async function adminFetch<T>(
       ...options.headers,
     },
   });
-  if (res.status === 204) return undefined as T;
+  if (res.status === 204) return undefined as unknown as T;
   if (!res.ok) {
     const body = await res.json().catch(() => ({ error: res.statusText })) as { error?: string };
     throw new ApiError(res.status, body.error ?? res.statusText);

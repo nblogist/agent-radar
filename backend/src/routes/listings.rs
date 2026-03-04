@@ -386,7 +386,10 @@ pub async fn submit_listing(
     }
 
     // --- Validate tag format before DB operations ---
-    let tag_re = regex::Regex::new(r"^[a-z0-9][a-z0-9-]{0,59}$").expect("valid regex");
+    static TAG_RE: std::sync::LazyLock<regex::Regex> = std::sync::LazyLock::new(|| {
+        regex::Regex::new(r"^[a-z0-9][a-z0-9-]{0,59}$").expect("valid regex")
+    });
+    let tag_re = &*TAG_RE;
     let mut validated_tags: Vec<String> = Vec::new();
     for tag_name_raw in &payload.tags {
         let tag_name = tag_name_raw.trim().to_lowercase();
@@ -437,7 +440,7 @@ pub async fn submit_listing(
             .bind(cat_id)
             .fetch_one(&mut *tx)
             .await
-            .unwrap_or(false);
+            .map_err(|e| AppError::Db(e).into_response())?;
         if !exists {
             return Err(AppError::Validation(format!("category {} does not exist", cat_id)).into_response());
         }
@@ -477,7 +480,7 @@ pub async fn submit_listing(
             .bind(chain_id)
             .fetch_one(&mut *tx)
             .await
-            .unwrap_or(false);
+            .map_err(|e| AppError::Db(e).into_response())?;
         if !exists {
             return Err(AppError::Validation(format!("chain {} does not exist", chain_id)).into_response());
         }

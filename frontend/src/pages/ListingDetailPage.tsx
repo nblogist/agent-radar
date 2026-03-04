@@ -1,6 +1,6 @@
 import { Link, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { fetchListing } from '../lib/api';
+import { fetchListing, ApiError } from '../lib/api';
 import { getCategoryColor } from '../lib/categoryColors';
 import ListingLogo from '../components/ListingLogo';
 import MarkdownRenderer from '../components/MarkdownRenderer';
@@ -42,17 +42,32 @@ export default function ListingDetailPage() {
     );
   }
 
-  if (error || !listing) {
+  if (error) {
+    const is404 = error instanceof ApiError && error.status === 404;
     return (
       <main className="flex-1 max-w-7xl mx-auto w-full px-6 lg:px-20 py-20 text-center">
-        <span className="material-symbols-outlined text-6xl text-slate-600 mb-4">error_outline</span>
-        <h1 className="text-3xl font-bold mb-2">Listing Not Found</h1>
-        <p className="text-slate-400 mb-8">The listing you're looking for doesn't exist or has been removed.</p>
-        <Link to="/browse" className="inline-block bg-primary text-white px-8 py-3 rounded-lg font-bold hover:bg-primary/90 transition-colors">
-          Browse Directory
-        </Link>
+        <span className="material-symbols-outlined text-6xl text-slate-600 mb-4">{is404 ? 'error_outline' : 'cloud_off'}</span>
+        <h1 className="text-3xl font-bold mb-2">{is404 ? 'Listing Not Found' : 'Failed to Load'}</h1>
+        <p className="text-slate-400 mb-8">
+          {is404
+            ? "The listing you're looking for doesn't exist or has been removed."
+            : 'Something went wrong. Please check your connection and try again.'}
+        </p>
+        {is404 ? (
+          <Link to="/browse" className="inline-block bg-primary text-white px-8 py-3 rounded-lg font-bold hover:bg-primary/90 transition-colors">
+            Browse Directory
+          </Link>
+        ) : (
+          <button onClick={() => window.location.reload()} className="bg-primary text-white px-8 py-3 rounded-lg font-bold hover:bg-primary/90 transition-colors">
+            Retry
+          </button>
+        )}
       </main>
     );
+  }
+
+  if (!listing) {
+    return null;
   }
 
   return (

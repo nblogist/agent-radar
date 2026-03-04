@@ -253,19 +253,10 @@ pub async fn admin_approve_listing(
     let listing_id = uuid::Uuid::parse_str(id)
         .map_err(|_| AppError::Validation("invalid listing id".to_string()).into_response())?;
 
-    // Fetch current status to avoid double-incrementing counts
-    let current_status: String = sqlx::query_scalar::<_, String>(
-        "SELECT status FROM listings WHERE id = $1",
-    )
-    .bind(listing_id)
-    .fetch_optional(pool.inner())
-    .await
-    .map_err(|e| AppError::Db(e).into_response())?
-    .ok_or_else(|| AppError::NotFound.into_response())?;
-
+    // Atomic: only update if not already approved, returns None if already approved or not found
     let updated = sqlx::query_as::<_, Listing>(
         "UPDATE listings SET status = 'approved', approved_at = now(), updated_at = now() \
-         WHERE id = $1 \
+         WHERE id = $1 AND status != 'approved' \
          RETURNING id, name, slug, short_description, description, logo_url, website_url, \
          github_url, docs_url, api_endpoint_url, contact_email, status, rejection_note, \
          reputation_score, is_featured, view_count, submitted_at, updated_at, approved_at",
@@ -273,26 +264,46 @@ pub async fn admin_approve_listing(
     .bind(listing_id)
     .fetch_optional(pool.inner())
     .await
-    .map_err(|e| AppError::Db(e).into_response())?
-    .ok_or_else(|| AppError::NotFound.into_response())?;
+    .map_err(|e| AppError::Db(e).into_response())?;
 
-    // Only increment counts when transitioning from non-approved to approved
-    if current_status != "approved" {
-        let _ = sqlx::query(
-            "UPDATE categories SET listing_count = listing_count + 1 \
-             WHERE id IN (SELECT category_id FROM listing_categories WHERE listing_id = $1)",
-        )
-        .bind(listing_id)
-        .execute(pool.inner())
-        .await;
+    let updated = match updated {
+        Some(listing) => listing,
+        None => {
+            // Either not found or already approved — fetch to distinguish
+            return sqlx::query_as::<_, Listing>(
+                "SELECT id, name, slug, short_description, description, logo_url, website_url, \
+                 github_url, docs_url, api_endpoint_url, contact_email, status, rejection_note, \
+                 reputation_score, is_featured, view_count, submitted_at, updated_at, approved_at \
+                 FROM listings WHERE id = $1",
+            )
+            .bind(listing_id)
+            .fetch_optional(pool.inner())
+            .await
+            .map_err(|e| AppError::Db(e).into_response())?
+            .map(Json)
+            .ok_or_else(|| AppError::NotFound.into_response());
+        }
+    };
 
-        let _ = sqlx::query(
-            "UPDATE tags SET listing_count = listing_count + 1 \
-             WHERE id IN (SELECT tag_id FROM listing_tags WHERE listing_id = $1)",
-        )
-        .bind(listing_id)
-        .execute(pool.inner())
-        .await;
+    // Increment counts — only runs once per approval due to WHERE status != 'approved'
+    if let Err(e) = sqlx::query(
+        "UPDATE categories SET listing_count = listing_count + 1 \
+         WHERE id IN (SELECT category_id FROM listing_categories WHERE listing_id = $1)",
+    )
+    .bind(listing_id)
+    .execute(pool.inner())
+    .await {
+        tracing::error!("Failed to increment category counts for listing {}: {}", listing_id, e);
+    }
+
+    if let Err(e) = sqlx::query(
+        "UPDATE tags SET listing_count = listing_count + 1 \
+         WHERE id IN (SELECT tag_id FROM listing_tags WHERE listing_id = $1)",
+    )
+    .bind(listing_id)
+    .execute(pool.inner())
+    .await {
+        tracing::error!("Failed to increment tag counts for listing {}: {}", listing_id, e);
     }
 
     Ok(Json(updated))
@@ -313,9 +324,12 @@ pub async fn admin_reject_listing(
     let listing_id = uuid::Uuid::parse_str(id)
         .map_err(|_| AppError::Validation("invalid listing id".to_string()).into_response())?;
 
-    // Fetch current status — need to decrement counts if transitioning from approved
-    let current_status: String = sqlx::query_scalar::<_, String>(
-        "SELECT status FROM listings WHERE id = $1",
+    let note = body.into_inner().note;
+
+    // Atomic: capture old status and update in one shot
+    // Returns the old status alongside the updated row
+    let was_approved: bool = sqlx::query_scalar::<_, bool>(
+        "SELECT status = 'approved' FROM listings WHERE id = $1",
     )
     .bind(listing_id)
     .fetch_optional(pool.inner())
@@ -323,11 +337,9 @@ pub async fn admin_reject_listing(
     .map_err(|e| AppError::Db(e).into_response())?
     .ok_or_else(|| AppError::NotFound.into_response())?;
 
-    let note = body.into_inner().note;
-
     let updated = sqlx::query_as::<_, Listing>(
         "UPDATE listings SET status = 'rejected', rejection_note = $2, updated_at = now() \
-         WHERE id = $1 \
+         WHERE id = $1 AND status != 'rejected' \
          RETURNING id, name, slug, short_description, description, logo_url, website_url, \
          github_url, docs_url, api_endpoint_url, contact_email, status, rejection_note, \
          reputation_score, is_featured, view_count, submitted_at, updated_at, approved_at",
@@ -336,26 +348,48 @@ pub async fn admin_reject_listing(
     .bind(note)
     .fetch_optional(pool.inner())
     .await
-    .map_err(|e| AppError::Db(e).into_response())?
-    .ok_or_else(|| AppError::NotFound.into_response())?;
+    .map_err(|e| AppError::Db(e).into_response())?;
 
-    // Decrement counts if transitioning from approved to rejected
-    if current_status == "approved" {
-        let _ = sqlx::query(
+    let updated = match updated {
+        Some(listing) => listing,
+        None => {
+            // Already rejected — just return current state
+            return sqlx::query_as::<_, Listing>(
+                "SELECT id, name, slug, short_description, description, logo_url, website_url, \
+                 github_url, docs_url, api_endpoint_url, contact_email, status, rejection_note, \
+                 reputation_score, is_featured, view_count, submitted_at, updated_at, approved_at \
+                 FROM listings WHERE id = $1",
+            )
+            .bind(listing_id)
+            .fetch_optional(pool.inner())
+            .await
+            .map_err(|e| AppError::Db(e).into_response())?
+            .map(Json)
+            .ok_or_else(|| AppError::NotFound.into_response());
+        }
+    };
+
+    // Decrement counts only if was approved before this rejection
+    if was_approved {
+        if let Err(e) = sqlx::query(
             "UPDATE categories SET listing_count = GREATEST(listing_count - 1, 0) \
              WHERE id IN (SELECT category_id FROM listing_categories WHERE listing_id = $1)",
         )
         .bind(listing_id)
         .execute(pool.inner())
-        .await;
+        .await {
+            tracing::error!("Failed to decrement category counts for listing {}: {}", listing_id, e);
+        }
 
-        let _ = sqlx::query(
+        if let Err(e) = sqlx::query(
             "UPDATE tags SET listing_count = GREATEST(listing_count - 1, 0) \
              WHERE id IN (SELECT tag_id FROM listing_tags WHERE listing_id = $1)",
         )
         .bind(listing_id)
         .execute(pool.inner())
-        .await;
+        .await {
+            tracing::error!("Failed to decrement tag counts for listing {}: {}", listing_id, e);
+        }
     }
 
     Ok(Json(updated))
@@ -401,6 +435,56 @@ pub async fn admin_update_listing(
         .into_response());
     }
 
+    // --- Validate fields if provided ---
+    if let Some(ref name) = upd.name {
+        let n = name.trim();
+        if n.is_empty() || n.len() > 100 {
+            return Err(AppError::Validation("name must be 1-100 characters".to_string()).into_response());
+        }
+    }
+    if let Some(ref sd) = upd.short_description {
+        let s = sd.trim();
+        if s.is_empty() || s.len() > 140 {
+            return Err(AppError::Validation("short_description must be 1-140 characters".to_string()).into_response());
+        }
+    }
+    if let Some(ref desc) = upd.description {
+        let d = desc.trim();
+        if d.len() < 10 {
+            return Err(AppError::Validation("description must be at least 10 characters".to_string()).into_response());
+        }
+        if d.len() > 10_000 {
+            return Err(AppError::Validation("description must be at most 10,000 characters".to_string()).into_response());
+        }
+    }
+    if let Some(ref url) = upd.website_url {
+        if !url.starts_with("https://") {
+            return Err(AppError::Validation("website_url must start with https://".to_string()).into_response());
+        }
+    }
+    if let Some(ref gh) = upd.github_url {
+        if !gh.is_empty() && !gh.starts_with("https://github.com/") {
+            return Err(AppError::Validation("github_url must start with https://github.com/".to_string()).into_response());
+        }
+    }
+    for (field_name, field_val) in [
+        ("logo_url", &upd.logo_url),
+        ("docs_url", &upd.docs_url),
+        ("api_endpoint_url", &upd.api_endpoint_url),
+    ] {
+        if let Some(ref url) = field_val {
+            if !url.is_empty() && !url.starts_with("https://") && !url.starts_with("http://") {
+                return Err(AppError::Validation(format!("{} must start with https:// or http://", field_name)).into_response());
+            }
+        }
+    }
+    if let Some(ref email) = upd.contact_email {
+        let e = email.trim();
+        if !e.contains('@') || !e.contains('.') {
+            return Err(AppError::Validation("contact_email must be a valid email address".to_string()).into_response());
+        }
+    }
+
     add_field!(upd.name, "name");
     add_field!(upd.short_description, "short_description");
     add_field!(upd.description, "description");
@@ -412,9 +496,10 @@ pub async fn admin_update_listing(
     add_field!(upd.contact_email, "contact_email");
     add_field!(upd.rejection_note, "rejection_note");
 
-    // Handle is_featured (bool) — safe to inline since it's only true/false
     if let Some(featured) = upd.is_featured {
-        set_clauses.push(format!("is_featured = {}", featured));
+        set_clauses.push(format!("is_featured = ${}::boolean", param_idx));
+        string_binds.push(Some(featured.to_string()));
+        param_idx += 1;
     }
 
     let has_scalar_changes = !set_clauses.is_empty();
@@ -507,10 +592,16 @@ pub async fn admin_update_listing(
             .await
             .map_err(|e| AppError::Db(e).into_response())?;
 
+        static TAG_RE: std::sync::LazyLock<regex::Regex> = std::sync::LazyLock::new(|| {
+            regex::Regex::new(r"^[a-z0-9][a-z0-9-]{0,59}$").expect("valid regex")
+        });
         for tag_name_raw in &tag_names {
             let tag_name = tag_name_raw.trim().to_lowercase();
             if tag_name.is_empty() || tag_name.len() > 60 {
-                continue;
+                return Err(AppError::Validation(format!("tag '{}' must be 1-60 characters", tag_name_raw)).into_response());
+            }
+            if !TAG_RE.is_match(&tag_name) {
+                return Err(AppError::Validation(format!("tag '{}' must be lowercase alphanumeric and hyphens only", tag_name_raw)).into_response());
             }
             let tag_slug = slug::slugify(&tag_name);
             let tag_id: uuid::Uuid = sqlx::query_scalar(
@@ -594,9 +685,9 @@ pub async fn admin_delete_listing(
     let listing_id = uuid::Uuid::parse_str(id)
         .map_err(|_| AppError::Validation("invalid listing id".to_string()).into_response())?;
 
-    // Fetch current status before deleting — need to decrement counts if approved
-    let current_status: String = sqlx::query_scalar::<_, String>(
-        "SELECT status FROM listings WHERE id = $1",
+    // Fetch status and related IDs before deleting (CASCADE will remove join rows)
+    let was_approved: bool = sqlx::query_scalar::<_, bool>(
+        "SELECT status = 'approved' FROM listings WHERE id = $1",
     )
     .bind(listing_id)
     .fetch_optional(pool.inner())
@@ -604,23 +695,27 @@ pub async fn admin_delete_listing(
     .map_err(|e| AppError::Db(e).into_response())?
     .ok_or_else(|| AppError::NotFound.into_response())?;
 
-    // If the listing was approved, decrement listing_count on categories and tags
-    if current_status == "approved" {
-        let _ = sqlx::query(
+    // Decrement counts BEFORE delete (since CASCADE removes join rows)
+    if was_approved {
+        if let Err(e) = sqlx::query(
             "UPDATE categories SET listing_count = GREATEST(listing_count - 1, 0) \
              WHERE id IN (SELECT category_id FROM listing_categories WHERE listing_id = $1)",
         )
         .bind(listing_id)
         .execute(pool.inner())
-        .await;
+        .await {
+            tracing::error!("Failed to decrement category counts for listing {}: {}", listing_id, e);
+        }
 
-        let _ = sqlx::query(
+        if let Err(e) = sqlx::query(
             "UPDATE tags SET listing_count = GREATEST(listing_count - 1, 0) \
              WHERE id IN (SELECT tag_id FROM listing_tags WHERE listing_id = $1)",
         )
         .bind(listing_id)
         .execute(pool.inner())
-        .await;
+        .await {
+            tracing::error!("Failed to decrement tag counts for listing {}: {}", listing_id, e);
+        }
     }
 
     let result = sqlx::query("DELETE FROM listings WHERE id = $1")

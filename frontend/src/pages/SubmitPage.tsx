@@ -93,6 +93,28 @@ export default function SubmitPage() {
       return;
     }
 
+    if (!websiteUrl.startsWith('https://')) {
+      setFormError('Website URL must start with https://');
+      return;
+    }
+
+    if (githubUrl && !githubUrl.startsWith('https://github.com/')) {
+      setFormError('GitHub URL must start with https://github.com/');
+      return;
+    }
+
+    for (const [label, url] of [['Logo URL', logoUrl], ['Docs URL', docsUrl], ['API Endpoint', apiEndpointUrl]] as const) {
+      if (url && !url.startsWith('https://') && !url.startsWith('http://')) {
+        setFormError(`${label} must start with https:// or http://`);
+        return;
+      }
+    }
+
+    if (description.trim().length < 10) {
+      setFormError('Description must be at least 10 characters.');
+      return;
+    }
+
     const payload: NewListingPayload = {
       name,
       short_description: shortDesc,
@@ -476,7 +498,7 @@ export default function SubmitPage() {
             {/* Error message */}
             {(formError || mutation.error) && (
               <div className="mt-6 p-4 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-sm">
-                {formError || (mutation.error as Error).message}
+                {formError || (mutation.error instanceof Error ? mutation.error.message : 'Submission failed. Please try again.')}
               </div>
             )}
 
