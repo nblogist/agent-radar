@@ -82,19 +82,12 @@ export function AdminLayout() {
               )}
             </form>
           </div>
-          <div className="flex items-center gap-4">
-            <button className="p-2 text-slate-500 hover:bg-slate-800 rounded-full relative">
-              <span className="material-symbols-outlined">notifications</span>
-              <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border-2 border-dark-bg"></span>
-            </button>
-            <div className="flex items-center gap-3 pl-4 border-l border-slate-800">
-              <div className="text-right hidden sm:block">
-                <p className="text-sm font-bold leading-none">Admin User</p>
-                <p className="text-xs text-slate-400">System Manager</p>
-              </div>
-              <div className="w-9 h-9 rounded-full bg-slate-800 flex items-center justify-center overflow-hidden">
-                <img alt="User Avatar" className="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuA0weBOjwDjXBXxC03YQ5chgfQHCa3khkvYfYHxe7GbjS2eDJ2EKCKrqaGgo2ZtIWkPrcPHkvXPzyZwCfLFrsb2r5l1FEVIf68nCjFaCSheHRfaQUJ4d5bWE3dDlU2WvCNNYC5sxVx8I9amilkzS1QEbLraL93FzPN7zvmq5xrok98WorK1cu-HNwunROzdQNhBT2D-Mj2IypoZpMpXvN4lNiTx-N1hfQMOYp1T14OLZNpp89fMvPwEoVN2YxNt3N4ZFa3ioz_BVvQ" />
-              </div>
+          <div className="flex items-center gap-3 pl-4 border-l border-slate-800">
+            <div className="text-right hidden sm:block">
+              <p className="text-sm font-bold leading-none">Admin</p>
+            </div>
+            <div className="w-9 h-9 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold text-sm">
+              A
             </div>
           </div>
         </header>

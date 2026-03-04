@@ -14,11 +14,11 @@ export default function Footer() {
             Discover and explore AI agents, tools, and infrastructure across the decentralized web. An open directory for the agentic economy.
           </p>
           <div className="flex gap-4 mt-6">
-            <a href="#" className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center hover:bg-primary hover:text-white transition-colors">
-              <span className="material-symbols-outlined text-sm">public</span>
+            <a href="https://github.com/nblogist/AgentRadar" target="_blank" rel="noopener noreferrer" className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center hover:bg-primary hover:text-white transition-colors">
+              <span className="material-symbols-outlined text-sm">code</span>
             </a>
-            <a href="#" className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center hover:bg-primary hover:text-white transition-colors">
-              <span className="material-symbols-outlined text-sm">alternate_email</span>
+            <a href="https://www.nervos.org/" target="_blank" rel="noopener noreferrer" className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center hover:bg-primary hover:text-white transition-colors">
+              <span className="material-symbols-outlined text-sm">public</span>
             </a>
           </div>
         </div>
@@ -38,10 +38,10 @@ export default function Footer() {
             </ul>
           </div>
           <div>
-            <h4 className="font-bold mb-4">Legal</h4>
+            <h4 className="font-bold mb-4">Initiative</h4>
             <ul className="space-y-2 text-sm text-slate-500">
-              <li><a href="#" className="hover:text-primary transition-colors">Terms</a></li>
-              <li><a href="#" className="hover:text-primary transition-colors">Privacy</a></li>
+              <li><a href="https://www.nervos.org/" target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors">Nervos Network</a></li>
+              <li><a href="https://github.com/nblogist/AgentRadar" target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors">GitHub</a></li>
             </ul>
           </div>
         </div>
