@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use rocket::response::status::Custom;
 use rocket::serde::json::Json;
 use rocket::State;
@@ -81,6 +83,121 @@ pub async fn fetch_chains(pool: &DbPool, listing_id: uuid::Uuid) -> Result<Vec<C
     .bind(listing_id)
     .fetch_all(pool)
     .await
+}
+
+// ---------------------------------------------------------------------------
+// Batch helpers: fetch associated data for multiple listings in one query each
+// ---------------------------------------------------------------------------
+
+#[derive(sqlx::FromRow)]
+struct CategoryRefWithListing {
+    listing_id: uuid::Uuid,
+    id: uuid::Uuid,
+    name: String,
+    slug: String,
+}
+
+#[derive(sqlx::FromRow)]
+struct TagRefWithListing {
+    listing_id: uuid::Uuid,
+    id: uuid::Uuid,
+    name: String,
+    slug: String,
+}
+
+#[derive(sqlx::FromRow)]
+struct ChainRefWithListing {
+    listing_id: uuid::Uuid,
+    id: uuid::Uuid,
+    name: String,
+    slug: String,
+    is_featured: bool,
+}
+
+async fn fetch_categories_batch(pool: &DbPool, ids: &[uuid::Uuid]) -> Result<HashMap<uuid::Uuid, Vec<CategoryRef>>, sqlx::Error> {
+    let rows = sqlx::query_as::<_, CategoryRefWithListing>(
+        "SELECT lc.listing_id, c.id, c.name, c.slug FROM categories c \
+         INNER JOIN listing_categories lc ON lc.category_id = c.id \
+         WHERE lc.listing_id = ANY($1) \
+         ORDER BY c.name ASC"
+    )
+    .bind(ids)
+    .fetch_all(pool)
+    .await?;
+
+    let mut map: HashMap<uuid::Uuid, Vec<CategoryRef>> = HashMap::new();
+    for r in rows {
+        map.entry(r.listing_id).or_default().push(CategoryRef { id: r.id, name: r.name, slug: r.slug });
+    }
+    Ok(map)
+}
+
+async fn fetch_tags_batch(pool: &DbPool, ids: &[uuid::Uuid]) -> Result<HashMap<uuid::Uuid, Vec<TagRef>>, sqlx::Error> {
+    let rows = sqlx::query_as::<_, TagRefWithListing>(
+        "SELECT lt.listing_id, t.id, t.name, t.slug FROM tags t \
+         INNER JOIN listing_tags lt ON lt.tag_id = t.id \
+         WHERE lt.listing_id = ANY($1) \
+         ORDER BY t.name ASC"
+    )
+    .bind(ids)
+    .fetch_all(pool)
+    .await?;
+
+    let mut map: HashMap<uuid::Uuid, Vec<TagRef>> = HashMap::new();
+    for r in rows {
+        map.entry(r.listing_id).or_default().push(TagRef { id: r.id, name: r.name, slug: r.slug });
+    }
+    Ok(map)
+}
+
+async fn fetch_chains_batch(pool: &DbPool, ids: &[uuid::Uuid]) -> Result<HashMap<uuid::Uuid, Vec<ChainRef>>, sqlx::Error> {
+    let rows = sqlx::query_as::<_, ChainRefWithListing>(
+        "SELECT lch.listing_id, cs.id, cs.name, cs.slug, cs.is_featured FROM chain_support cs \
+         INNER JOIN listing_chains lch ON lch.chain_id = cs.id \
+         WHERE lch.listing_id = ANY($1) \
+         ORDER BY cs.is_featured DESC, cs.name ASC"
+    )
+    .bind(ids)
+    .fetch_all(pool)
+    .await?;
+
+    let mut map: HashMap<uuid::Uuid, Vec<ChainRef>> = HashMap::new();
+    for r in rows {
+        map.entry(r.listing_id).or_default().push(ChainRef { id: r.id, name: r.name, slug: r.slug, is_featured: r.is_featured });
+    }
+    Ok(map)
+}
+
+fn build_public_listings_batch(
+    rows: Vec<Listing>,
+    mut cats: HashMap<uuid::Uuid, Vec<CategoryRef>>,
+    mut tags: HashMap<uuid::Uuid, Vec<TagRef>>,
+    mut chains: HashMap<uuid::Uuid, Vec<ChainRef>>,
+) -> Vec<PublicListing> {
+    rows.into_iter().map(|row| {
+        let id = row.id;
+        PublicListing {
+            id: row.id,
+            name: row.name,
+            slug: row.slug,
+            short_description: row.short_description,
+            description: row.description,
+            logo_url: row.logo_url,
+            website_url: row.website_url,
+            github_url: row.github_url,
+            docs_url: row.docs_url,
+            api_endpoint_url: row.api_endpoint_url,
+            reputation_score: row.reputation_score,
+            is_featured: row.is_featured,
+            view_count: row.view_count,
+            submitted_at: row.submitted_at,
+            updated_at: row.updated_at,
+            approved_at: row.approved_at,
+            categories: cats.remove(&id).unwrap_or_default(),
+            tags: tags.remove(&id).unwrap_or_default(),
+            chains: chains.remove(&id).unwrap_or_default(),
+        }
+    }).collect()
 }
 
 async fn build_public_listing(pool: &DbPool, row: Listing) -> Result<PublicListing, sqlx::Error> {
@@ -249,14 +366,15 @@ pub async fn list_listings(
         .await
         .map_err(|e| AppError::Db(e).into_response())?;
 
-    // Build PublicListing for each row
-    let mut data: Vec<PublicListing> = Vec::with_capacity(rows.len());
-    for row in rows {
-        let pl = build_public_listing(pool.inner(), row)
-            .await
-            .map_err(|e| AppError::Db(e).into_response())?;
-        data.push(pl);
-    }
+    // Batch-load all associations in 3 queries (instead of 3 per listing)
+    let ids: Vec<uuid::Uuid> = rows.iter().map(|r| r.id).collect();
+    let cats = fetch_categories_batch(pool.inner(), &ids)
+        .await.map_err(|e| AppError::Db(e).into_response())?;
+    let tags = fetch_tags_batch(pool.inner(), &ids)
+        .await.map_err(|e| AppError::Db(e).into_response())?;
+    let chains = fetch_chains_batch(pool.inner(), &ids)
+        .await.map_err(|e| AppError::Db(e).into_response())?;
+    let data = build_public_listings_batch(rows, cats, tags, chains);
 
     let total_pages = if per_page > 0 {
         (total + per_page - 1) / per_page
