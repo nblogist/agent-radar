@@ -41,20 +41,26 @@ pub struct ReadRateLimit;
 pub struct SubmitRateLimit;
 
 fn get_client_ip(req: &Request<'_>) -> Option<IpAddr> {
-    // Prefer X-Real-IP or X-Forwarded-For if behind a proxy
-    if let Some(ip_str) = req.headers().get_one("X-Real-IP") {
-        if let Ok(ip) = ip_str.parse::<IpAddr>() {
-            return Some(ip);
-        }
-    }
-    if let Some(ip_str) = req.headers().get_one("X-Forwarded-For") {
-        // Take only the first address
-        if let Some(first) = ip_str.split(',').next() {
-            if let Ok(ip) = first.trim().parse::<IpAddr>() {
+    // Only trust proxy headers when explicitly configured (TRUST_PROXY=true)
+    let trust_proxy = std::env::var("TRUST_PROXY")
+        .map(|v| v == "true" || v == "1")
+        .unwrap_or(false);
+
+    if trust_proxy {
+        if let Some(ip_str) = req.headers().get_one("X-Real-IP") {
+            if let Ok(ip) = ip_str.parse::<IpAddr>() {
                 return Some(ip);
             }
         }
+        if let Some(ip_str) = req.headers().get_one("X-Forwarded-For") {
+            if let Some(first) = ip_str.split(',').next() {
+                if let Ok(ip) = first.trim().parse::<IpAddr>() {
+                    return Some(ip);
+                }
+            }
+        }
     }
+
     req.client_ip()
 }
 

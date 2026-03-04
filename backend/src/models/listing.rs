@@ -21,6 +21,7 @@ pub struct Listing {
     pub status: String,
     pub rejection_note: Option<String>,
     pub reputation_score: Option<f64>,
+    pub is_featured: bool,
     pub view_count: i32,
     pub submitted_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
@@ -42,6 +43,7 @@ pub struct PublicListing {
     pub docs_url: Option<String>,
     pub api_endpoint_url: Option<String>,
     pub reputation_score: Option<f64>,
+    pub is_featured: bool,
     pub view_count: i32,
     pub submitted_at: DateTime<Utc>,
     pub approved_at: Option<DateTime<Utc>>,
@@ -68,6 +70,20 @@ pub struct NewListing {
     pub tags: Vec<String>,
     /// Chain UUIDs to associate with this listing
     pub chains: Vec<Uuid>,
+    /// User-suggested chain names (not yet in chain_support table)
+    #[serde(default)]
+    pub suggested_chains: Vec<String>,
+}
+
+/// A chain suggestion row from the chain_suggestions table.
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct ChainSuggestion {
+    pub id: Uuid,
+    pub name: String,
+    pub listing_id: Uuid,
+    pub status: String,
+    pub created_at: DateTime<Utc>,
+    pub reviewed_at: Option<DateTime<Utc>>,
 }
 
 /// Reference to a category in listing responses.

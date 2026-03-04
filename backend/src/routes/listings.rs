@@ -99,6 +99,7 @@ async fn build_public_listing(pool: &DbPool, row: Listing) -> Result<PublicListi
         docs_url: row.docs_url,
         api_endpoint_url: row.api_endpoint_url,
         reputation_score: row.reputation_score,
+        is_featured: row.is_featured,
         view_count: row.view_count,
         submitted_at: row.submitted_at,
         approved_at: row.approved_at,
@@ -177,7 +178,9 @@ pub async fn list_listings(
     if let Some(search) = query.search {
         let trimmed = search.trim();
         if !trimmed.is_empty() {
-            let like_val = format!("%{}%", trimmed);
+            // Escape ILIKE wildcards to prevent wildcard injection
+            let escaped = trimmed.replace('\\', "\\\\").replace('%', "\\%").replace('_', "\\_");
+            let like_val = format!("%{}%", escaped);
             where_clauses.push(format!(
                 "(l.name ILIKE ${p} OR l.description ILIKE ${p})",
                 p = param_idx
@@ -215,7 +218,7 @@ pub async fn list_listings(
     let list_sql = format!(
         "SELECT DISTINCT l.id, l.name, l.slug, l.short_description, l.description, \
          l.logo_url, l.website_url, l.github_url, l.docs_url, l.api_endpoint_url, \
-         l.contact_email, l.status, l.rejection_note, l.reputation_score, l.view_count, \
+         l.contact_email, l.status, l.rejection_note, l.reputation_score, l.is_featured, l.view_count, \
          l.submitted_at, l.updated_at, l.approved_at \
          FROM listings l {} {} \
          ORDER BY {} \
@@ -283,7 +286,7 @@ pub async fn get_listing(
          WHERE slug = $1 AND status = 'approved' \
          RETURNING id, name, slug, short_description, description, \
                    logo_url, website_url, github_url, docs_url, api_endpoint_url, \
-                   contact_email, status, rejection_note, reputation_score, view_count, \
+                   contact_email, status, rejection_note, reputation_score, is_featured, view_count, \
                    submitted_at, updated_at, approved_at"
     )
     .bind(slug)
@@ -350,12 +353,27 @@ pub async fn submit_listing(
     if payload.description.trim().len() < 10 {
         return Err(AppError::Validation("description must be at least 10 characters".to_string()).into_response());
     }
+    if payload.description.trim().len() > 10_000 {
+        return Err(AppError::Validation("description must be at most 10,000 characters".to_string()).into_response());
+    }
     if !payload.website_url.starts_with("https://") {
         return Err(AppError::Validation("website_url must start with https://".to_string()).into_response());
     }
     if let Some(ref gh) = payload.github_url {
         if !gh.is_empty() && !gh.starts_with("https://github.com/") {
             return Err(AppError::Validation("github_url must start with https://github.com/".to_string()).into_response());
+        }
+    }
+    // Validate optional URL fields start with https://
+    for (field_name, field_val) in [
+        ("logo_url", &payload.logo_url),
+        ("docs_url", &payload.docs_url),
+        ("api_endpoint_url", &payload.api_endpoint_url),
+    ] {
+        if let Some(ref url) = field_val {
+            if !url.is_empty() && !url.starts_with("https://") && !url.starts_with("http://") {
+                return Err(AppError::Validation(format!("{} must start with https:// or http://", field_name)).into_response());
+            }
         }
     }
     let email = payload.contact_email.trim().to_string();
@@ -385,6 +403,11 @@ pub async fn submit_listing(
         .await
         .map_err(|e| AppError::Db(e).into_response())?;
 
+    // --- All DB writes wrapped in a transaction to prevent orphaned listings ---
+    let mut tx = pool.inner().begin()
+        .await
+        .map_err(|e| AppError::Db(e).into_response())?;
+
     // --- Insert listing ---
     let listing_id: uuid::Uuid = sqlx::query_scalar(
         "INSERT INTO listings \
@@ -403,7 +426,7 @@ pub async fn submit_listing(
     .bind(&payload.docs_url)
     .bind(&payload.api_endpoint_url)
     .bind(&email)
-    .fetch_one(pool.inner())
+    .fetch_one(&mut *tx)
     .await
     .map_err(|e| AppError::Db(e).into_response())?;
 
@@ -411,7 +434,7 @@ pub async fn submit_listing(
     for cat_id in &payload.categories {
         let exists: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM categories WHERE id = $1)")
             .bind(cat_id)
-            .fetch_one(pool.inner())
+            .fetch_one(&mut *tx)
             .await
             .unwrap_or(false);
         if !exists {
@@ -420,7 +443,7 @@ pub async fn submit_listing(
         sqlx::query("INSERT INTO listing_categories (listing_id, category_id) VALUES ($1, $2) ON CONFLICT DO NOTHING")
             .bind(listing_id)
             .bind(cat_id)
-            .execute(pool.inner())
+            .execute(&mut *tx)
             .await
             .map_err(|e| AppError::Db(e).into_response())?;
     }
@@ -428,7 +451,6 @@ pub async fn submit_listing(
     // --- Upsert tags and associate ---
     for tag_name in &validated_tags {
         let tag_slug = slug::slugify(tag_name);
-        // Upsert tag: create if not exists, otherwise return existing id
         let tag_id: uuid::Uuid = sqlx::query_scalar(
             "INSERT INTO tags (id, name, slug) VALUES (gen_random_uuid(), $1, $2) \
              ON CONFLICT (slug) DO UPDATE SET name = EXCLUDED.name \
@@ -436,14 +458,14 @@ pub async fn submit_listing(
         )
         .bind(tag_name)
         .bind(&tag_slug)
-        .fetch_one(pool.inner())
+        .fetch_one(&mut *tx)
         .await
         .map_err(|e| AppError::Db(e).into_response())?;
 
         sqlx::query("INSERT INTO listing_tags (listing_id, tag_id) VALUES ($1, $2) ON CONFLICT DO NOTHING")
             .bind(listing_id)
             .bind(tag_id)
-            .execute(pool.inner())
+            .execute(&mut *tx)
             .await
             .map_err(|e| AppError::Db(e).into_response())?;
     }
@@ -452,7 +474,7 @@ pub async fn submit_listing(
     for chain_id in &payload.chains {
         let exists: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM chain_support WHERE id = $1)")
             .bind(chain_id)
-            .fetch_one(pool.inner())
+            .fetch_one(&mut *tx)
             .await
             .unwrap_or(false);
         if !exists {
@@ -461,9 +483,26 @@ pub async fn submit_listing(
         sqlx::query("INSERT INTO listing_chains (listing_id, chain_id) VALUES ($1, $2) ON CONFLICT DO NOTHING")
             .bind(listing_id)
             .bind(chain_id)
-            .execute(pool.inner())
+            .execute(&mut *tx)
             .await
             .map_err(|e| AppError::Db(e).into_response())?;
+    }
+
+    // --- Store chain suggestions ---
+    for suggested in &payload.suggested_chains {
+        let name = suggested.trim().to_string();
+        if name.is_empty() || name.len() > 100 {
+            continue;
+        }
+        sqlx::query(
+            "INSERT INTO chain_suggestions (id, name, listing_id, status) \
+             VALUES (gen_random_uuid(), $1, $2, 'pending')"
+        )
+        .bind(&name)
+        .bind(listing_id)
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| AppError::Db(e).into_response())?;
     }
 
     // --- Fetch submitted_at for response ---
@@ -471,9 +510,14 @@ pub async fn submit_listing(
         "SELECT submitted_at FROM listings WHERE id = $1"
     )
     .bind(listing_id)
-    .fetch_one(pool.inner())
+    .fetch_one(&mut *tx)
     .await
     .map_err(|e| AppError::Db(e).into_response())?;
+
+    // --- Commit transaction ---
+    tx.commit()
+        .await
+        .map_err(|e| AppError::Db(e).into_response())?;
 
     let response = SubmitResponse {
         id: listing_id,

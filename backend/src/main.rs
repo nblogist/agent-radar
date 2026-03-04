@@ -16,8 +16,30 @@ use rocket::{Request, Response};
 use rocket::http::Status;
 use rocket::serde::json::Json;
 
+use rocket::response::{self, Responder};
+
 use crate::errors::ErrorBody;
 use crate::guards::rate_limit::{ReadRateLimiters, SubmitRateLimiters};
+
+/// Custom responder that adds Retry-After header to 429 responses.
+struct RateLimitError;
+
+impl<'r> Responder<'r, 'static> for RateLimitError {
+    fn respond_to(self, _req: &'r Request<'_>) -> response::Result<'static> {
+        let body = serde_json::json!({
+            "error": "Too many requests. Please slow down.",
+            "code": "RATE_LIMIT"
+        })
+        .to_string();
+
+        Response::build()
+            .status(Status::TooManyRequests)
+            .header(Header::new("Retry-After", "60"))
+            .header(Header::new("Content-Type", "application/json"))
+            .sized_body(body.len(), std::io::Cursor::new(body))
+            .ok()
+    }
+}
 
 // ---------------------------------------------------------------------------
 // CORS Fairing
@@ -81,11 +103,8 @@ fn unauthorized_catcher() -> Json<ErrorBody> {
 }
 
 #[catch(429)]
-fn rate_limit_catcher() -> (Status, Json<ErrorBody>) {
-    (Status::TooManyRequests, Json(ErrorBody {
-        error: "Too many requests. Please slow down.".to_string(),
-        code: "RATE_LIMIT".to_string(),
-    }))
+fn rate_limit_catcher() -> RateLimitError {
+    RateLimitError
 }
 
 #[catch(404)]
@@ -108,17 +127,21 @@ async fn seed_admin_token(pool: &crate::db::DbPool) {
 
     if count == 0 {
         let raw_token = std::env::var("ADMIN_TOKEN")
-            .unwrap_or_else(|_| "change-this-in-production".to_string());
+            .expect("ADMIN_TOKEN env var must be set. Refusing to start with default token.");
         match bcrypt::hash(&raw_token, bcrypt::DEFAULT_COST) {
             Ok(hashed) => {
-                let _ = sqlx::query(
+                if let Err(e) = sqlx::query(
                     "INSERT INTO admin_tokens (id, token_hash, label, created_at) \
                      VALUES (gen_random_uuid(), $1, 'default', now())"
                 )
                 .bind(&hashed)
                 .execute(pool)
-                .await;
-                tracing::info!("Admin token seeded into admin_tokens table");
+                .await
+                {
+                    tracing::error!("Failed to seed admin token: {}", e);
+                } else {
+                    tracing::info!("Admin token seeded into admin_tokens table");
+                }
             }
             Err(e) => {
                 tracing::error!("Failed to hash admin token: {}", e);
@@ -188,5 +211,11 @@ async fn rocket() -> _ {
             routes::admin::listings::admin_update_listing,
             routes::admin::listings::admin_delete_listing,
             routes::admin::listings::admin_get_stats,
+            routes::admin::listings::admin_create_category,
+            routes::admin::listings::admin_create_chain,
+            routes::admin::listings::admin_toggle_featured,
+            routes::admin::listings::admin_list_chain_suggestions,
+            routes::admin::listings::admin_approve_chain_suggestion,
+            routes::admin::listings::admin_reject_chain_suggestion,
         ])
 }

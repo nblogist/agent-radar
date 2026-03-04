@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use crate::db::DbPool;
 use crate::errors::{AppError, ErrorBody};
 use crate::guards::admin_token::AdminToken;
-use crate::models::listing::{CategoryRef, ChainRef, Listing, TagRef};
+use crate::models::listing::{CategoryRef, ChainRef, ChainSuggestion, Listing, TagRef};
 use crate::routes::listings::{PaginatedResponse, PaginationMeta};
 
 // ---------------------------------------------------------------------------
@@ -55,8 +55,27 @@ pub struct UpdateListingBody {
     pub docs_url: Option<String>,
     pub api_endpoint_url: Option<String>,
     pub contact_email: Option<String>,
+    pub is_featured: Option<bool>,
     pub status: Option<String>,
     pub rejection_note: Option<String>,
+    /// Replace all category associations (list of category UUIDs)
+    pub categories: Option<Vec<String>>,
+    /// Replace all tag associations (list of tag names — upserted)
+    pub tags: Option<Vec<String>>,
+    /// Replace all chain associations (list of chain UUIDs)
+    pub chains: Option<Vec<String>>,
+}
+
+#[derive(Deserialize)]
+pub struct CreateCategoryBody {
+    pub name: String,
+}
+
+#[derive(Deserialize)]
+pub struct CreateChainBody {
+    pub name: String,
+    #[serde(default)]
+    pub is_featured: bool,
 }
 
 // ---------------------------------------------------------------------------
@@ -116,7 +135,8 @@ pub async fn admin_list_listings(
                 "(name ILIKE ${p} OR short_description ILIKE ${p})",
                 p = param_idx
             ));
-            binds.push(format!("%{}%", s));
+            let escaped = s.replace('\\', "\\\\").replace('%', "\\%").replace('_', "\\_");
+            binds.push(format!("%{}%", escaped));
             param_idx += 1;
         }
     }
@@ -142,7 +162,7 @@ pub async fn admin_list_listings(
     let list_sql = format!(
         "SELECT id, name, slug, short_description, description, logo_url, website_url, \
          github_url, docs_url, api_endpoint_url, contact_email, status, rejection_note, \
-         reputation_score, view_count, submitted_at, updated_at, approved_at \
+         reputation_score, is_featured, view_count, submitted_at, updated_at, approved_at \
          FROM listings {} ORDER BY submitted_at DESC LIMIT ${} OFFSET ${}",
         where_sql, limit_p, offset_p
     );
@@ -192,7 +212,7 @@ pub async fn admin_get_listing(
     let listing = sqlx::query_as::<_, Listing>(
         "SELECT id, name, slug, short_description, description, logo_url, website_url, \
          github_url, docs_url, api_endpoint_url, contact_email, status, rejection_note, \
-         reputation_score, view_count, submitted_at, updated_at, approved_at \
+         reputation_score, is_featured, view_count, submitted_at, updated_at, approved_at \
          FROM listings WHERE id = $1",
     )
     .bind(listing_id)
@@ -233,12 +253,9 @@ pub async fn admin_approve_listing(
     let listing_id = uuid::Uuid::parse_str(id)
         .map_err(|_| AppError::Validation("invalid listing id".to_string()).into_response())?;
 
-    let updated = sqlx::query_as::<_, Listing>(
-        "UPDATE listings SET status = 'approved', approved_at = now(), updated_at = now() \
-         WHERE id = $1 \
-         RETURNING id, name, slug, short_description, description, logo_url, website_url, \
-         github_url, docs_url, api_endpoint_url, contact_email, status, rejection_note, \
-         reputation_score, view_count, submitted_at, updated_at, approved_at",
+    // Fetch current status to avoid double-incrementing counts
+    let current_status: String = sqlx::query_scalar::<_, String>(
+        "SELECT status FROM listings WHERE id = $1",
     )
     .bind(listing_id)
     .fetch_optional(pool.inner())
@@ -246,23 +263,37 @@ pub async fn admin_approve_listing(
     .map_err(|e| AppError::Db(e).into_response())?
     .ok_or_else(|| AppError::NotFound.into_response())?;
 
-    // Increment listing_count for associated categories
-    let _ = sqlx::query(
-        "UPDATE categories SET listing_count = listing_count + 1 \
-         WHERE id IN (SELECT category_id FROM listing_categories WHERE listing_id = $1)",
+    let updated = sqlx::query_as::<_, Listing>(
+        "UPDATE listings SET status = 'approved', approved_at = now(), updated_at = now() \
+         WHERE id = $1 \
+         RETURNING id, name, slug, short_description, description, logo_url, website_url, \
+         github_url, docs_url, api_endpoint_url, contact_email, status, rejection_note, \
+         reputation_score, is_featured, view_count, submitted_at, updated_at, approved_at",
     )
     .bind(listing_id)
-    .execute(pool.inner())
-    .await;
+    .fetch_optional(pool.inner())
+    .await
+    .map_err(|e| AppError::Db(e).into_response())?
+    .ok_or_else(|| AppError::NotFound.into_response())?;
 
-    // Increment listing_count for associated tags
-    let _ = sqlx::query(
-        "UPDATE tags SET listing_count = listing_count + 1 \
-         WHERE id IN (SELECT tag_id FROM listing_tags WHERE listing_id = $1)",
-    )
-    .bind(listing_id)
-    .execute(pool.inner())
-    .await;
+    // Only increment counts when transitioning from non-approved to approved
+    if current_status != "approved" {
+        let _ = sqlx::query(
+            "UPDATE categories SET listing_count = listing_count + 1 \
+             WHERE id IN (SELECT category_id FROM listing_categories WHERE listing_id = $1)",
+        )
+        .bind(listing_id)
+        .execute(pool.inner())
+        .await;
+
+        let _ = sqlx::query(
+            "UPDATE tags SET listing_count = listing_count + 1 \
+             WHERE id IN (SELECT tag_id FROM listing_tags WHERE listing_id = $1)",
+        )
+        .bind(listing_id)
+        .execute(pool.inner())
+        .await;
+    }
 
     Ok(Json(updated))
 }
@@ -282,6 +313,16 @@ pub async fn admin_reject_listing(
     let listing_id = uuid::Uuid::parse_str(id)
         .map_err(|_| AppError::Validation("invalid listing id".to_string()).into_response())?;
 
+    // Fetch current status — need to decrement counts if transitioning from approved
+    let current_status: String = sqlx::query_scalar::<_, String>(
+        "SELECT status FROM listings WHERE id = $1",
+    )
+    .bind(listing_id)
+    .fetch_optional(pool.inner())
+    .await
+    .map_err(|e| AppError::Db(e).into_response())?
+    .ok_or_else(|| AppError::NotFound.into_response())?;
+
     let note = body.into_inner().note;
 
     let updated = sqlx::query_as::<_, Listing>(
@@ -289,7 +330,7 @@ pub async fn admin_reject_listing(
          WHERE id = $1 \
          RETURNING id, name, slug, short_description, description, logo_url, website_url, \
          github_url, docs_url, api_endpoint_url, contact_email, status, rejection_note, \
-         reputation_score, view_count, submitted_at, updated_at, approved_at",
+         reputation_score, is_featured, view_count, submitted_at, updated_at, approved_at",
     )
     .bind(listing_id)
     .bind(note)
@@ -297,6 +338,25 @@ pub async fn admin_reject_listing(
     .await
     .map_err(|e| AppError::Db(e).into_response())?
     .ok_or_else(|| AppError::NotFound.into_response())?;
+
+    // Decrement counts if transitioning from approved to rejected
+    if current_status == "approved" {
+        let _ = sqlx::query(
+            "UPDATE categories SET listing_count = GREATEST(listing_count - 1, 0) \
+             WHERE id IN (SELECT category_id FROM listing_categories WHERE listing_id = $1)",
+        )
+        .bind(listing_id)
+        .execute(pool.inner())
+        .await;
+
+        let _ = sqlx::query(
+            "UPDATE tags SET listing_count = GREATEST(listing_count - 1, 0) \
+             WHERE id IN (SELECT tag_id FROM listing_tags WHERE listing_id = $1)",
+        )
+        .bind(listing_id)
+        .execute(pool.inner())
+        .await;
+    }
 
     Ok(Json(updated))
 }
@@ -312,7 +372,7 @@ pub async fn admin_update_listing(
     id: &str,
     body: Json<UpdateListingBody>,
     _auth: AdminToken,
-) -> Result<Json<Listing>, Custom<Json<ErrorBody>>> {
+) -> Result<Json<AdminListingDetail>, Custom<Json<ErrorBody>>> {
     let listing_id = uuid::Uuid::parse_str(id)
         .map_err(|_| AppError::Validation("invalid listing id".to_string()).into_response())?;
 
@@ -333,6 +393,14 @@ pub async fn admin_update_listing(
         };
     }
 
+    // Block status changes via PATCH — use /approve or /reject endpoints instead
+    if upd.status.is_some() {
+        return Err(AppError::Validation(
+            "Cannot change status via PATCH. Use /approve or /reject endpoints.".to_string(),
+        )
+        .into_response());
+    }
+
     add_field!(upd.name, "name");
     add_field!(upd.short_description, "short_description");
     add_field!(upd.description, "description");
@@ -342,50 +410,174 @@ pub async fn admin_update_listing(
     add_field!(upd.docs_url, "docs_url");
     add_field!(upd.api_endpoint_url, "api_endpoint_url");
     add_field!(upd.contact_email, "contact_email");
-    add_field!(upd.status, "status");
     add_field!(upd.rejection_note, "rejection_note");
 
-    if set_clauses.is_empty() {
-        // Nothing to update — fetch and return current state
-        let listing = sqlx::query_as::<_, Listing>(
+    // Handle is_featured (bool) — safe to inline since it's only true/false
+    if let Some(featured) = upd.is_featured {
+        set_clauses.push(format!("is_featured = {}", featured));
+    }
+
+    let has_scalar_changes = !set_clauses.is_empty();
+    let has_relation_changes = upd.categories.is_some() || upd.tags.is_some() || upd.chains.is_some();
+
+    // Update scalar fields if any
+    let listing = if has_scalar_changes {
+        set_clauses.push("updated_at = now()".to_string());
+
+        let update_sql = format!(
+            "UPDATE listings SET {} WHERE id = ${} \
+             RETURNING id, name, slug, short_description, description, logo_url, website_url, \
+             github_url, docs_url, api_endpoint_url, contact_email, status, rejection_note, \
+             reputation_score, is_featured, view_count, submitted_at, updated_at, approved_at",
+            set_clauses.join(", "),
+            param_idx
+        );
+
+        let mut q = sqlx::query_as::<_, Listing>(&update_sql);
+        for bind_val in string_binds {
+            q = q.bind(bind_val);
+        }
+        q = q.bind(listing_id);
+
+        q.fetch_optional(pool.inner())
+            .await
+            .map_err(|e| AppError::Db(e).into_response())?
+            .ok_or_else(|| AppError::NotFound.into_response())?
+    } else if has_relation_changes {
+        // Touch updated_at even if only relations changed
+        sqlx::query_as::<_, Listing>(
+            "UPDATE listings SET updated_at = now() WHERE id = $1 \
+             RETURNING id, name, slug, short_description, description, logo_url, website_url, \
+             github_url, docs_url, api_endpoint_url, contact_email, status, rejection_note, \
+             reputation_score, is_featured, view_count, submitted_at, updated_at, approved_at",
+        )
+        .bind(listing_id)
+        .fetch_optional(pool.inner())
+        .await
+        .map_err(|e| AppError::Db(e).into_response())?
+        .ok_or_else(|| AppError::NotFound.into_response())?
+    } else {
+        // Nothing to update at all
+        sqlx::query_as::<_, Listing>(
             "SELECT id, name, slug, short_description, description, logo_url, website_url, \
              github_url, docs_url, api_endpoint_url, contact_email, status, rejection_note, \
-             reputation_score, view_count, submitted_at, updated_at, approved_at \
+             reputation_score, is_featured, view_count, submitted_at, updated_at, approved_at \
              FROM listings WHERE id = $1",
         )
         .bind(listing_id)
         .fetch_optional(pool.inner())
         .await
         .map_err(|e| AppError::Db(e).into_response())?
-        .ok_or_else(|| AppError::NotFound.into_response())?;
+        .ok_or_else(|| AppError::NotFound.into_response())?
+    };
 
-        return Ok(Json(listing));
+    // --- Replace categories if provided ---
+    if let Some(cat_ids) = upd.categories {
+        sqlx::query("DELETE FROM listing_categories WHERE listing_id = $1")
+            .bind(listing_id)
+            .execute(pool.inner())
+            .await
+            .map_err(|e| AppError::Db(e).into_response())?;
+
+        for cat_id_str in &cat_ids {
+            let cat_id = uuid::Uuid::parse_str(cat_id_str)
+                .map_err(|_| AppError::Validation(format!("invalid category id: {}", cat_id_str)).into_response())?;
+            let exists: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM categories WHERE id = $1)")
+                .bind(cat_id)
+                .fetch_one(pool.inner())
+                .await
+                .map_err(|e| AppError::Db(e).into_response())?;
+            if !exists {
+                return Err(AppError::Validation(format!("category {} does not exist", cat_id_str)).into_response());
+            }
+            sqlx::query("INSERT INTO listing_categories (listing_id, category_id) VALUES ($1, $2) ON CONFLICT DO NOTHING")
+                .bind(listing_id)
+                .bind(cat_id)
+                .execute(pool.inner())
+                .await
+                .map_err(|e| AppError::Db(e).into_response())?;
+        }
     }
 
-    set_clauses.push("updated_at = now()".to_string());
+    // --- Replace tags if provided (upsert by name) ---
+    if let Some(tag_names) = upd.tags {
+        sqlx::query("DELETE FROM listing_tags WHERE listing_id = $1")
+            .bind(listing_id)
+            .execute(pool.inner())
+            .await
+            .map_err(|e| AppError::Db(e).into_response())?;
 
-    let update_sql = format!(
-        "UPDATE listings SET {} WHERE id = ${} \
-         RETURNING id, name, slug, short_description, description, logo_url, website_url, \
-         github_url, docs_url, api_endpoint_url, contact_email, status, rejection_note, \
-         reputation_score, view_count, submitted_at, updated_at, approved_at",
-        set_clauses.join(", "),
-        param_idx
-    );
+        for tag_name_raw in &tag_names {
+            let tag_name = tag_name_raw.trim().to_lowercase();
+            if tag_name.is_empty() || tag_name.len() > 60 {
+                continue;
+            }
+            let tag_slug = slug::slugify(&tag_name);
+            let tag_id: uuid::Uuid = sqlx::query_scalar(
+                "INSERT INTO tags (id, name, slug) VALUES (gen_random_uuid(), $1, $2) \
+                 ON CONFLICT (slug) DO UPDATE SET name = EXCLUDED.name \
+                 RETURNING id",
+            )
+            .bind(&tag_name)
+            .bind(&tag_slug)
+            .fetch_one(pool.inner())
+            .await
+            .map_err(|e| AppError::Db(e).into_response())?;
 
-    let mut q = sqlx::query_as::<_, Listing>(&update_sql);
-    for bind_val in string_binds {
-        q = q.bind(bind_val);
+            sqlx::query("INSERT INTO listing_tags (listing_id, tag_id) VALUES ($1, $2) ON CONFLICT DO NOTHING")
+                .bind(listing_id)
+                .bind(tag_id)
+                .execute(pool.inner())
+                .await
+                .map_err(|e| AppError::Db(e).into_response())?;
+        }
     }
-    q = q.bind(listing_id);
 
-    let updated = q
-        .fetch_optional(pool.inner())
+    // --- Replace chains if provided ---
+    if let Some(chain_ids) = upd.chains {
+        sqlx::query("DELETE FROM listing_chains WHERE listing_id = $1")
+            .bind(listing_id)
+            .execute(pool.inner())
+            .await
+            .map_err(|e| AppError::Db(e).into_response())?;
+
+        for chain_id_str in &chain_ids {
+            let chain_id = uuid::Uuid::parse_str(chain_id_str)
+                .map_err(|_| AppError::Validation(format!("invalid chain id: {}", chain_id_str)).into_response())?;
+            let exists: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM chain_support WHERE id = $1)")
+                .bind(chain_id)
+                .fetch_one(pool.inner())
+                .await
+                .map_err(|e| AppError::Db(e).into_response())?;
+            if !exists {
+                return Err(AppError::Validation(format!("chain {} does not exist", chain_id_str)).into_response());
+            }
+            sqlx::query("INSERT INTO listing_chains (listing_id, chain_id) VALUES ($1, $2) ON CONFLICT DO NOTHING")
+                .bind(listing_id)
+                .bind(chain_id)
+                .execute(pool.inner())
+                .await
+                .map_err(|e| AppError::Db(e).into_response())?;
+        }
+    }
+
+    // Fetch fresh relations and return full detail
+    let categories = crate::routes::listings::fetch_categories(pool.inner(), listing_id)
         .await
-        .map_err(|e| AppError::Db(e).into_response())?
-        .ok_or_else(|| AppError::NotFound.into_response())?;
+        .map_err(|e| AppError::Db(e).into_response())?;
+    let tags = crate::routes::listings::fetch_tags(pool.inner(), listing_id)
+        .await
+        .map_err(|e| AppError::Db(e).into_response())?;
+    let chains = crate::routes::listings::fetch_chains(pool.inner(), listing_id)
+        .await
+        .map_err(|e| AppError::Db(e).into_response())?;
 
-    Ok(Json(updated))
+    Ok(Json(AdminListingDetail {
+        listing,
+        categories,
+        tags,
+        chains,
+    }))
 }
 
 // ---------------------------------------------------------------------------
@@ -401,6 +593,35 @@ pub async fn admin_delete_listing(
 ) -> Result<rocket::http::Status, Custom<Json<ErrorBody>>> {
     let listing_id = uuid::Uuid::parse_str(id)
         .map_err(|_| AppError::Validation("invalid listing id".to_string()).into_response())?;
+
+    // Fetch current status before deleting — need to decrement counts if approved
+    let current_status: String = sqlx::query_scalar::<_, String>(
+        "SELECT status FROM listings WHERE id = $1",
+    )
+    .bind(listing_id)
+    .fetch_optional(pool.inner())
+    .await
+    .map_err(|e| AppError::Db(e).into_response())?
+    .ok_or_else(|| AppError::NotFound.into_response())?;
+
+    // If the listing was approved, decrement listing_count on categories and tags
+    if current_status == "approved" {
+        let _ = sqlx::query(
+            "UPDATE categories SET listing_count = GREATEST(listing_count - 1, 0) \
+             WHERE id IN (SELECT category_id FROM listing_categories WHERE listing_id = $1)",
+        )
+        .bind(listing_id)
+        .execute(pool.inner())
+        .await;
+
+        let _ = sqlx::query(
+            "UPDATE tags SET listing_count = GREATEST(listing_count - 1, 0) \
+             WHERE id IN (SELECT tag_id FROM listing_tags WHERE listing_id = $1)",
+        )
+        .bind(listing_id)
+        .execute(pool.inner())
+        .await;
+    }
 
     let result = sqlx::query("DELETE FROM listings WHERE id = $1")
         .bind(listing_id)
@@ -488,4 +709,244 @@ pub async fn admin_get_stats(
         total_views,
         top_listings,
     }))
+}
+
+// ---------------------------------------------------------------------------
+// POST /api/admin/categories
+// Create a new category. Returns the created category.
+// ---------------------------------------------------------------------------
+
+#[post("/categories", data = "<body>")]
+pub async fn admin_create_category(
+    pool: &State<DbPool>,
+    body: Json<CreateCategoryBody>,
+    _auth: AdminToken,
+) -> Result<Json<CategoryRef>, Custom<Json<ErrorBody>>> {
+    let name = body.into_inner().name.trim().to_string();
+    if name.is_empty() || name.len() > 100 {
+        return Err(AppError::Validation("category name must be 1-100 characters".to_string()).into_response());
+    }
+    let cat_slug = slug::slugify(&name);
+    if cat_slug.is_empty() {
+        return Err(AppError::Validation("category name must contain at least one alphanumeric character".to_string()).into_response());
+    }
+
+    let cat = sqlx::query_as::<_, CategoryRef>(
+        "INSERT INTO categories (id, name, slug) VALUES (gen_random_uuid(), $1, $2) \
+         ON CONFLICT (slug) DO UPDATE SET name = EXCLUDED.name \
+         RETURNING id, name, slug",
+    )
+    .bind(&name)
+    .bind(&cat_slug)
+    .fetch_one(pool.inner())
+    .await
+    .map_err(|e| AppError::Db(e).into_response())?;
+
+    Ok(Json(cat))
+}
+
+// ---------------------------------------------------------------------------
+// POST /api/admin/chains
+// Create a new chain. Returns the created chain.
+// ---------------------------------------------------------------------------
+
+#[post("/chains", data = "<body>")]
+pub async fn admin_create_chain(
+    pool: &State<DbPool>,
+    body: Json<CreateChainBody>,
+    _auth: AdminToken,
+) -> Result<Json<ChainRef>, Custom<Json<ErrorBody>>> {
+    let inner = body.into_inner();
+    let name = inner.name.trim().to_string();
+    if name.is_empty() || name.len() > 100 {
+        return Err(AppError::Validation("chain name must be 1-100 characters".to_string()).into_response());
+    }
+    let chain_slug = slug::slugify(&name);
+    if chain_slug.is_empty() {
+        return Err(AppError::Validation("chain name must contain at least one alphanumeric character".to_string()).into_response());
+    }
+
+    let chain = sqlx::query_as::<_, ChainRef>(
+        "INSERT INTO chain_support (id, name, slug, is_featured) VALUES (gen_random_uuid(), $1, $2, $3) \
+         ON CONFLICT (slug) DO UPDATE SET name = EXCLUDED.name \
+         RETURNING id, name, slug, is_featured",
+    )
+    .bind(&name)
+    .bind(&chain_slug)
+    .bind(inner.is_featured)
+    .fetch_one(pool.inner())
+    .await
+    .map_err(|e| AppError::Db(e).into_response())?;
+
+    Ok(Json(chain))
+}
+
+// ---------------------------------------------------------------------------
+// POST /api/admin/listings/:id/toggle-featured
+// Quick toggle for is_featured. Returns the updated listing.
+// ---------------------------------------------------------------------------
+
+#[post("/listings/<id>/toggle-featured")]
+pub async fn admin_toggle_featured(
+    pool: &State<DbPool>,
+    id: &str,
+    _auth: AdminToken,
+) -> Result<Json<Listing>, Custom<Json<ErrorBody>>> {
+    let listing_id = uuid::Uuid::parse_str(id)
+        .map_err(|_| AppError::Validation("invalid listing id".to_string()).into_response())?;
+
+    let updated = sqlx::query_as::<_, Listing>(
+        "UPDATE listings SET is_featured = NOT is_featured, updated_at = now() \
+         WHERE id = $1 \
+         RETURNING id, name, slug, short_description, description, logo_url, website_url, \
+         github_url, docs_url, api_endpoint_url, contact_email, status, rejection_note, \
+         reputation_score, is_featured, view_count, submitted_at, updated_at, approved_at",
+    )
+    .bind(listing_id)
+    .fetch_optional(pool.inner())
+    .await
+    .map_err(|e| AppError::Db(e).into_response())?
+    .ok_or_else(|| AppError::NotFound.into_response())?;
+
+    Ok(Json(updated))
+}
+
+// ---------------------------------------------------------------------------
+// GET /api/admin/chain-suggestions
+// List all chain suggestions, optionally filtered by status.
+// ---------------------------------------------------------------------------
+
+#[derive(rocket::form::FromForm, Default)]
+pub struct ChainSuggestionQuery<'r> {
+    pub status: Option<&'r str>,
+}
+
+#[get("/chain-suggestions?<query..>")]
+pub async fn admin_list_chain_suggestions(
+    pool: &State<DbPool>,
+    query: ChainSuggestionQuery<'_>,
+    _auth: AdminToken,
+) -> Result<Json<Vec<ChainSuggestion>>, Custom<Json<ErrorBody>>> {
+    let rows = if let Some(status) = query.status {
+        let s = status.trim();
+        if !s.is_empty() {
+            sqlx::query_as::<_, ChainSuggestion>(
+                "SELECT id, name, listing_id, status, created_at, reviewed_at \
+                 FROM chain_suggestions WHERE status = $1 ORDER BY created_at DESC"
+            )
+            .bind(s)
+            .fetch_all(pool.inner())
+            .await
+            .map_err(|e| AppError::Db(e).into_response())?
+        } else {
+            sqlx::query_as::<_, ChainSuggestion>(
+                "SELECT id, name, listing_id, status, created_at, reviewed_at \
+                 FROM chain_suggestions ORDER BY created_at DESC"
+            )
+            .fetch_all(pool.inner())
+            .await
+            .map_err(|e| AppError::Db(e).into_response())?
+        }
+    } else {
+        sqlx::query_as::<_, ChainSuggestion>(
+            "SELECT id, name, listing_id, status, created_at, reviewed_at \
+             FROM chain_suggestions ORDER BY created_at DESC"
+        )
+        .fetch_all(pool.inner())
+        .await
+        .map_err(|e| AppError::Db(e).into_response())?
+    };
+
+    Ok(Json(rows))
+}
+
+// ---------------------------------------------------------------------------
+// POST /api/admin/chain-suggestions/:id/approve
+// Approve a chain suggestion: creates a chain_support entry, links it to the
+// listing, and marks the suggestion as approved.
+// ---------------------------------------------------------------------------
+
+#[post("/chain-suggestions/<id>/approve")]
+pub async fn admin_approve_chain_suggestion(
+    pool: &State<DbPool>,
+    id: &str,
+    _auth: AdminToken,
+) -> Result<Json<ChainRef>, Custom<Json<ErrorBody>>> {
+    let suggestion_id = uuid::Uuid::parse_str(id)
+        .map_err(|_| AppError::Validation("invalid suggestion id".to_string()).into_response())?;
+
+    // Fetch the suggestion
+    let suggestion = sqlx::query_as::<_, ChainSuggestion>(
+        "SELECT id, name, listing_id, status, created_at, reviewed_at \
+         FROM chain_suggestions WHERE id = $1"
+    )
+    .bind(suggestion_id)
+    .fetch_optional(pool.inner())
+    .await
+    .map_err(|e| AppError::Db(e).into_response())?
+    .ok_or_else(|| AppError::NotFound.into_response())?;
+
+    if suggestion.status != "pending" {
+        return Err(AppError::Validation("suggestion already reviewed".to_string()).into_response());
+    }
+
+    // Create the chain (upsert by slug)
+    let chain_slug = slug::slugify(&suggestion.name);
+    let chain = sqlx::query_as::<_, ChainRef>(
+        "INSERT INTO chain_support (id, name, slug, is_featured) VALUES (gen_random_uuid(), $1, $2, false) \
+         ON CONFLICT (slug) DO UPDATE SET name = EXCLUDED.name \
+         RETURNING id, name, slug, is_featured"
+    )
+    .bind(&suggestion.name)
+    .bind(&chain_slug)
+    .fetch_one(pool.inner())
+    .await
+    .map_err(|e| AppError::Db(e).into_response())?;
+
+    // Link chain to the listing
+    sqlx::query("INSERT INTO listing_chains (listing_id, chain_id) VALUES ($1, $2) ON CONFLICT DO NOTHING")
+        .bind(suggestion.listing_id)
+        .bind(chain.id)
+        .execute(pool.inner())
+        .await
+        .map_err(|e| AppError::Db(e).into_response())?;
+
+    // Mark suggestion as approved
+    sqlx::query("UPDATE chain_suggestions SET status = 'approved', reviewed_at = now() WHERE id = $1")
+        .bind(suggestion_id)
+        .execute(pool.inner())
+        .await
+        .map_err(|e| AppError::Db(e).into_response())?;
+
+    Ok(Json(chain))
+}
+
+// ---------------------------------------------------------------------------
+// POST /api/admin/chain-suggestions/:id/reject
+// Mark a chain suggestion as rejected.
+// ---------------------------------------------------------------------------
+
+#[post("/chain-suggestions/<id>/reject")]
+pub async fn admin_reject_chain_suggestion(
+    pool: &State<DbPool>,
+    id: &str,
+    _auth: AdminToken,
+) -> Result<rocket::http::Status, Custom<Json<ErrorBody>>> {
+    let suggestion_id = uuid::Uuid::parse_str(id)
+        .map_err(|_| AppError::Validation("invalid suggestion id".to_string()).into_response())?;
+
+    let result = sqlx::query(
+        "UPDATE chain_suggestions SET status = 'rejected', reviewed_at = now() \
+         WHERE id = $1 AND status = 'pending'"
+    )
+    .bind(suggestion_id)
+    .execute(pool.inner())
+    .await
+    .map_err(|e| AppError::Db(e).into_response())?;
+
+    if result.rows_affected() == 0 {
+        return Err(AppError::NotFound.into_response());
+    }
+
+    Ok(rocket::http::Status::NoContent)
 }
