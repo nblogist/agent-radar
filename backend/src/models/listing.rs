@@ -54,18 +54,27 @@ pub struct PublicListing {
 }
 
 /// Deserialized from POST /listings request body.
+/// All fields are Optional at the serde level so that missing-field errors
+/// are reported as structured field-level validation errors instead of a
+/// generic 422 from the Rocket catcher.
 #[derive(Debug, Deserialize)]
 pub struct NewListing {
-    pub name: String,
-    pub short_description: String,
-    pub description: String,
+    #[serde(default)]
+    pub name: Option<String>,
+    #[serde(default)]
+    pub short_description: Option<String>,
+    #[serde(default)]
+    pub description: Option<String>,
     pub logo_url: Option<String>,
-    pub website_url: String,
+    #[serde(default)]
+    pub website_url: Option<String>,
     pub github_url: Option<String>,
     pub docs_url: Option<String>,
     pub api_endpoint_url: Option<String>,
-    pub contact_email: String,
+    #[serde(default)]
+    pub contact_email: Option<String>,
     /// Category UUIDs to associate with this listing (min 1)
+    #[serde(default)]
     pub categories: Vec<Uuid>,
     /// Tag names (will be created if they don't exist, lowercase, max 60 chars)
     #[serde(default)]

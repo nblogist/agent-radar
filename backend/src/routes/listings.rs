@@ -578,34 +578,55 @@ pub async fn submit_listing(
     // --- Collect ALL validation errors at once ---
     let mut errors: Vec<FieldError> = Vec::new();
 
-    let name = payload.name.trim().to_string();
-    if name.is_empty() || name.len() > 100 {
+    // Extract required fields, collecting missing-field errors
+    let name = payload.name.as_deref().unwrap_or("").trim().to_string();
+    if name.is_empty() {
+        errors.push(FieldError {
+            field: "name".to_string(),
+            message: "is required".to_string(),
+        });
+    } else if name.len() > 100 {
         errors.push(FieldError {
             field: "name".to_string(),
             message: "must be 1-100 characters".to_string(),
         });
     }
-    let short_desc = payload.short_description.trim().to_string();
-    if short_desc.is_empty() || short_desc.len() > 140 {
+    let short_desc = payload.short_description.as_deref().unwrap_or("").trim().to_string();
+    if short_desc.is_empty() {
+        errors.push(FieldError {
+            field: "short_description".to_string(),
+            message: "is required".to_string(),
+        });
+    } else if short_desc.len() > 140 {
         errors.push(FieldError {
             field: "short_description".to_string(),
             message: "must be 1-140 characters".to_string(),
         });
     }
-    let desc_len = payload.description.trim().len();
-    if desc_len < 10 {
+    let description_raw = payload.description.as_deref().unwrap_or("").trim().to_string();
+    if description_raw.is_empty() {
+        errors.push(FieldError {
+            field: "description".to_string(),
+            message: "is required".to_string(),
+        });
+    } else if description_raw.len() < 10 {
         errors.push(FieldError {
             field: "description".to_string(),
             message: "must be at least 10 characters".to_string(),
         });
-    }
-    if desc_len > 10_000 {
+    } else if description_raw.len() > 10_000 {
         errors.push(FieldError {
             field: "description".to_string(),
             message: "must be at most 10,000 characters".to_string(),
         });
     }
-    if !payload.website_url.starts_with("https://") {
+    let website_url = payload.website_url.as_deref().unwrap_or("").trim().to_string();
+    if website_url.is_empty() {
+        errors.push(FieldError {
+            field: "website_url".to_string(),
+            message: "is required".to_string(),
+        });
+    } else if !website_url.starts_with("https://") {
         errors.push(FieldError {
             field: "website_url".to_string(),
             message: "must start with https://".to_string(),
@@ -633,8 +654,13 @@ pub async fn submit_listing(
             }
         }
     }
-    let email = payload.contact_email.trim().to_string();
-    if !email.contains('@') || !email.contains('.') {
+    let email = payload.contact_email.as_deref().unwrap_or("").trim().to_string();
+    if email.is_empty() {
+        errors.push(FieldError {
+            field: "contact_email".to_string(),
+            message: "is required".to_string(),
+        });
+    } else if !email.contains('@') || !email.contains('.') {
         errors.push(FieldError {
             field: "contact_email".to_string(),
             message: "must be a valid email address".to_string(),
@@ -696,9 +722,9 @@ pub async fn submit_listing(
     .bind(&name)
     .bind(&slug)
     .bind(&short_desc)
-    .bind(payload.description.trim())
+    .bind(&description_raw)
     .bind(&payload.logo_url)
-    .bind(&payload.website_url)
+    .bind(&website_url)
     .bind(&payload.github_url)
     .bind(&payload.docs_url)
     .bind(&payload.api_endpoint_url)
@@ -715,7 +741,10 @@ pub async fn submit_listing(
             .await
             .map_err(|e| AppError::Db(e).into_response())?;
         if !exists {
-            return Err(AppError::Validation(format!("category {} does not exist", cat_id)).into_response());
+            return Err(AppError::ValidationErrors(vec![crate::errors::FieldError {
+                field: "categories".to_string(),
+                message: format!("category {} does not exist", cat_id),
+            }]).into_response());
         }
         sqlx::query("INSERT INTO listing_categories (listing_id, category_id) VALUES ($1, $2) ON CONFLICT DO NOTHING")
             .bind(listing_id)
@@ -755,7 +784,10 @@ pub async fn submit_listing(
             .await
             .map_err(|e| AppError::Db(e).into_response())?;
         if !exists {
-            return Err(AppError::Validation(format!("chain {} does not exist", chain_id)).into_response());
+            return Err(AppError::ValidationErrors(vec![crate::errors::FieldError {
+                field: "chains".to_string(),
+                message: format!("chain {} does not exist", chain_id),
+            }]).into_response());
         }
         sqlx::query("INSERT INTO listing_chains (listing_id, chain_id) VALUES ($1, $2) ON CONFLICT DO NOTHING")
             .bind(listing_id)
