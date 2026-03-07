@@ -191,6 +191,8 @@ pub async fn admin_list_listings(
             per_page,
             total,
             total_pages,
+            has_next: page < total_pages,
+            has_previous: page > 1,
         },
     }))
 }

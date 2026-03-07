@@ -1,0 +1,17 @@
+{
+  "schema_version": "v1",
+  "name_for_human": "AgentRadar",
+  "name_for_model": "agentradar",
+  "description_for_human": "Discover and submit AI agent tools and services. Browse categories, search by keyword, and find the right agent tools for your needs.",
+  "description_for_model": "AgentRadar is an AI agent application directory. Use it to: (1) Search for AI agent tools by keyword, category, blockchain chain, or tag. (2) Get detailed information about specific tools including descriptions, links, and metadata. (3) Submit new AI agent tools for listing in the directory. (4) Browse available categories, chains, and tags to understand the ecosystem. The API returns JSON and supports pagination, filtering, and sorting. Get the OpenAPI spec at /api/openapi.json for full endpoint documentation.",
+  "auth": {
+    "type": "none"
+  },
+  "api": {
+    "type": "openapi",
+    "url": "/api/openapi.json"
+  },
+  "logo_url": "/favicon.svg",
+  "contact_email": "team@agentradar.dev",
+  "legal_info_url": "https://agentradar.dev/legal"
+}

@@ -68,8 +68,10 @@ pub struct NewListing {
     /// Category UUIDs to associate with this listing (min 1)
     pub categories: Vec<Uuid>,
     /// Tag names (will be created if they don't exist, lowercase, max 60 chars)
+    #[serde(default)]
     pub tags: Vec<String>,
     /// Chain UUIDs to associate with this listing
+    #[serde(default)]
     pub chains: Vec<Uuid>,
     /// User-suggested chain names (not yet in chain_support table)
     #[serde(default)]

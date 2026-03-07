@@ -1,0 +1,552 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "AgentRadar API",
+    "description": "AI-first agent application directory. Discover, search, and submit AI agent tools and services. Built for autonomous AI agents to integrate programmatically.",
+    "version": "1.0.0",
+    "contact": {
+      "name": "AgentRadar",
+      "url": "https://agentradar.dev"
+    },
+    "license": {
+      "name": "MIT"
+    }
+  },
+  "servers": [
+    {
+      "url": "/api",
+      "description": "API base path"
+    }
+  ],
+  "tags": [
+    { "name": "Listings", "description": "Browse and search agent tool listings" },
+    { "name": "Submissions", "description": "Submit new agent tools and check submission status" },
+    { "name": "Metadata", "description": "Categories, chains, and tags" },
+    { "name": "System", "description": "Health check and API info" },
+    { "name": "Admin", "description": "Administrative operations (requires Bearer token)" }
+  ],
+  "paths": {
+    "/health": {
+      "get": {
+        "tags": ["System"],
+        "summary": "Health check",
+        "description": "Returns API health status and version. No authentication required.",
+        "operationId": "healthCheck",
+        "responses": {
+          "200": {
+            "description": "API is healthy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": { "type": "string", "example": "ok" },
+                    "version": { "type": "string", "example": "1.0.0" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/openapi.json": {
+      "get": {
+        "tags": ["System"],
+        "summary": "OpenAPI specification",
+        "description": "Returns this OpenAPI 3.0 specification as JSON.",
+        "operationId": "getOpenApiSpec",
+        "responses": {
+          "200": {
+            "description": "OpenAPI spec",
+            "content": { "application/json": {} }
+          }
+        }
+      }
+    },
+    "/listings": {
+      "get": {
+        "tags": ["Listings"],
+        "summary": "List and search listings",
+        "description": "Returns paginated, filterable, sortable listings. Only approved listings are returned.",
+        "operationId": "listListings",
+        "parameters": [
+          {
+            "name": "search",
+            "in": "query",
+            "description": "Full-text search across listing name and description (case-insensitive)",
+            "schema": { "type": "string" },
+            "example": "DeFi"
+          },
+          {
+            "name": "category",
+            "in": "query",
+            "description": "Filter by category slug or UUID. Get valid values from GET /api/categories.",
+            "schema": { "type": "string" },
+            "examples": {
+              "by_slug": { "value": "developer-tools-infrastructure" },
+              "by_uuid": { "value": "db380313-5de5-4112-8a71-600566e54939" }
+            }
+          },
+          {
+            "name": "chain",
+            "in": "query",
+            "description": "Filter by chain slug or UUID (case-insensitive). Get valid values from GET /api/chains.",
+            "schema": { "type": "string" },
+            "examples": {
+              "by_slug": { "value": "ethereum" },
+              "by_uuid": { "value": "d3d3ed65-5520-4015-baf1-aabd6019b576" }
+            }
+          },
+          {
+            "name": "tag",
+            "in": "query",
+            "description": "Filter by tag slug. Get valid values from GET /api/tags.",
+            "schema": { "type": "string" },
+            "example": "ai-agent"
+          },
+          {
+            "name": "featured",
+            "in": "query",
+            "description": "Filter to only featured listings",
+            "schema": { "type": "boolean" },
+            "example": true
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "description": "Sort order. Valid values: 'newest' (default), 'views', 'alpha' (or 'name').",
+            "schema": { "type": "string", "enum": ["newest", "views", "alpha", "name"] },
+            "example": "views"
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "Page number (minimum 1, default 1)",
+            "schema": { "type": "integer", "minimum": 1, "default": 1 }
+          },
+          {
+            "name": "per_page",
+            "in": "query",
+            "description": "Results per page (1-100, default 20)",
+            "schema": { "type": "integer", "minimum": 1, "maximum": 100, "default": 20 }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated list of listings",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/Listing" }
+                    },
+                    "meta": { "$ref": "#/components/schemas/PaginationMeta" }
+                  }
+                }
+              }
+            }
+          },
+          "429": { "$ref": "#/components/responses/RateLimited" }
+        }
+      },
+      "post": {
+        "tags": ["Submissions"],
+        "summary": "Submit a new listing",
+        "description": "Submit a new agent tool/service for review. Listings are set to 'pending' status and must be approved by an admin before appearing in search results. Rate limited to 30 submissions per hour per IP.",
+        "operationId": "submitListing",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/NewListing" },
+              "example": {
+                "name": "My Agent Tool",
+                "short_description": "A brief one-line description of the tool (max 140 chars)",
+                "description": "## My Agent Tool\n\nA detailed markdown description of what this tool does, its features, and use cases. Must be at least 10 characters.",
+                "website_url": "https://myagenttool.com",
+                "contact_email": "team@myagenttool.com",
+                "categories": ["db380313-5de5-4112-8a71-600566e54939"],
+                "github_url": "https://github.com/org/repo",
+                "docs_url": "https://docs.myagenttool.com",
+                "tags": ["ai-agent", "sdk"],
+                "chains": ["d3d3ed65-5520-4015-baf1-aabd6019b576"],
+                "suggested_chains": ["Aptos"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Listing submitted successfully (pending review)",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/SubmitResponse" }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation error(s)",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ValidationError" },
+                "example": {
+                  "error": "name: must be 1-100 characters; categories: at least one category UUID is required",
+                  "code": "VALIDATION",
+                  "fields": [
+                    { "field": "name", "message": "must be 1-100 characters" },
+                    { "field": "categories", "message": "at least one category UUID is required" }
+                  ]
+                }
+              }
+            }
+          },
+          "429": { "$ref": "#/components/responses/RateLimited" }
+        }
+      }
+    },
+    "/listings/{slug_or_id}": {
+      "get": {
+        "tags": ["Listings"],
+        "summary": "Get listing detail",
+        "description": "Fetch a single listing by its URL slug or UUID. Increments the view counter.",
+        "operationId": "getListing",
+        "parameters": [
+          {
+            "name": "slug_or_id",
+            "in": "path",
+            "required": true,
+            "description": "Listing slug (e.g. 'dify') or UUID",
+            "schema": { "type": "string" },
+            "examples": {
+              "by_slug": { "value": "dify" },
+              "by_uuid": { "value": "0961bb81-32c8-4734-b2d2-6895f2fcbe47" }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Listing detail",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Listing" }
+              }
+            }
+          },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/submissions/{id}/status": {
+      "get": {
+        "tags": ["Submissions"],
+        "summary": "Check submission status",
+        "description": "Check the review status of a previously submitted listing using the ID returned from POST /api/listings.",
+        "operationId": "getSubmissionStatus",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Listing UUID (returned in the submit response)",
+            "schema": { "type": "string", "format": "uuid" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Submission status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": { "type": "string", "format": "uuid" },
+                    "slug": { "type": "string" },
+                    "status": { "type": "string", "enum": ["pending", "approved", "rejected"] },
+                    "submitted_at": { "type": "string", "format": "date-time" },
+                    "approved_at": { "type": "string", "format": "date-time", "nullable": true },
+                    "rejection_note": { "type": "string", "nullable": true }
+                  }
+                }
+              }
+            }
+          },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/categories": {
+      "get": {
+        "tags": ["Metadata"],
+        "summary": "List all categories",
+        "description": "Returns all available categories with their UUIDs. Use these UUIDs in the 'categories' field when submitting a listing, or use the slug in the 'category' query parameter when filtering listings.",
+        "operationId": "listCategories",
+        "responses": {
+          "200": {
+            "description": "Array of categories",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/Category" }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/chains": {
+      "get": {
+        "tags": ["Metadata"],
+        "summary": "List all supported chains",
+        "description": "Returns all supported blockchain chains with their UUIDs. Use these UUIDs in the 'chains' field when submitting a listing. If your chain isn't listed, use 'suggested_chains' in the submit payload.",
+        "operationId": "listChains",
+        "responses": {
+          "200": {
+            "description": "Array of chains",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/Chain" }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tags": {
+      "get": {
+        "tags": ["Metadata"],
+        "summary": "List all tags",
+        "description": "Returns all tags with listing counts. Use tag slugs in the 'tag' query parameter when filtering listings.",
+        "operationId": "listTags",
+        "responses": {
+          "200": {
+            "description": "Array of tags with listing counts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/Tag" }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Admin API authentication. Pass the admin token as a Bearer token in the Authorization header. Example: Authorization: Bearer your-admin-token"
+      }
+    },
+    "schemas": {
+      "Listing": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "name": { "type": "string" },
+          "slug": { "type": "string" },
+          "short_description": { "type": "string" },
+          "description": { "type": "string", "description": "Full description (supports Markdown)" },
+          "logo_url": { "type": "string", "nullable": true },
+          "website_url": { "type": "string", "format": "uri" },
+          "github_url": { "type": "string", "nullable": true },
+          "docs_url": { "type": "string", "nullable": true },
+          "api_endpoint_url": { "type": "string", "nullable": true },
+          "reputation_score": { "type": "number", "nullable": true },
+          "is_featured": { "type": "boolean" },
+          "view_count": { "type": "integer" },
+          "submitted_at": { "type": "string", "format": "date-time" },
+          "updated_at": { "type": "string", "format": "date-time" },
+          "approved_at": { "type": "string", "format": "date-time", "nullable": true },
+          "categories": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/CategoryRef" }
+          },
+          "tags": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/TagRef" }
+          },
+          "chains": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/ChainRef" }
+          }
+        }
+      },
+      "NewListing": {
+        "type": "object",
+        "required": ["name", "short_description", "description", "website_url", "contact_email", "categories"],
+        "properties": {
+          "name": { "type": "string", "minLength": 1, "maxLength": 100 },
+          "short_description": { "type": "string", "minLength": 1, "maxLength": 140 },
+          "description": { "type": "string", "minLength": 10, "maxLength": 10000, "description": "Supports Markdown formatting" },
+          "website_url": { "type": "string", "format": "uri", "description": "Must start with https://" },
+          "contact_email": { "type": "string", "format": "email" },
+          "categories": {
+            "type": "array",
+            "items": { "type": "string", "format": "uuid" },
+            "minItems": 1,
+            "description": "Array of category UUIDs. Get valid UUIDs from GET /api/categories."
+          },
+          "tags": {
+            "type": "array",
+            "items": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{0,59}$" },
+            "default": [],
+            "description": "Lowercase alphanumeric tags with hyphens (e.g. 'ai-agent'). Created automatically if they don't exist."
+          },
+          "chains": {
+            "type": "array",
+            "items": { "type": "string", "format": "uuid" },
+            "default": [],
+            "description": "Array of chain UUIDs. Get valid UUIDs from GET /api/chains."
+          },
+          "suggested_chains": {
+            "type": "array",
+            "items": { "type": "string" },
+            "default": [],
+            "description": "Suggest chain names not yet in the system (e.g. 'Aptos', 'Sui'). These go to admin review."
+          },
+          "logo_url": { "type": "string", "nullable": true, "description": "Must start with https:// or http://" },
+          "github_url": { "type": "string", "nullable": true, "description": "Must start with https://github.com/" },
+          "docs_url": { "type": "string", "nullable": true, "description": "Must start with https:// or http://" },
+          "api_endpoint_url": { "type": "string", "nullable": true, "description": "Must start with https:// or http://" }
+        }
+      },
+      "SubmitResponse": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid", "description": "Use this ID to check submission status via GET /api/submissions/{id}/status" },
+          "slug": { "type": "string" },
+          "status": { "type": "string", "enum": ["pending"] },
+          "message": { "type": "string" },
+          "submitted_at": { "type": "string", "format": "date-time" }
+        }
+      },
+      "PaginationMeta": {
+        "type": "object",
+        "properties": {
+          "page": { "type": "integer" },
+          "per_page": { "type": "integer" },
+          "total": { "type": "integer" },
+          "total_pages": { "type": "integer" },
+          "has_next": { "type": "boolean" },
+          "has_previous": { "type": "boolean" }
+        }
+      },
+      "Category": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "name": { "type": "string" },
+          "slug": { "type": "string" },
+          "listing_count": { "type": "integer" }
+        }
+      },
+      "Chain": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "name": { "type": "string" },
+          "slug": { "type": "string" },
+          "is_featured": { "type": "boolean" }
+        }
+      },
+      "Tag": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "name": { "type": "string" },
+          "slug": { "type": "string" },
+          "listing_count": { "type": "integer" }
+        }
+      },
+      "CategoryRef": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "name": { "type": "string" },
+          "slug": { "type": "string" }
+        }
+      },
+      "TagRef": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "name": { "type": "string" },
+          "slug": { "type": "string" }
+        }
+      },
+      "ChainRef": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "name": { "type": "string" },
+          "slug": { "type": "string" },
+          "is_featured": { "type": "boolean" }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "error": { "type": "string", "description": "Human-readable error message" },
+          "code": { "type": "string", "description": "Machine-readable error code", "enum": ["NOT_FOUND", "VALIDATION", "BAD_REQUEST", "UNAUTHORIZED", "RATE_LIMIT", "UNPROCESSABLE", "INTERNAL_ERROR", "DB_ERROR"] }
+        }
+      },
+      "ValidationError": {
+        "type": "object",
+        "properties": {
+          "error": { "type": "string", "description": "Summary of all validation errors" },
+          "code": { "type": "string", "enum": ["VALIDATION"] },
+          "fields": {
+            "type": "array",
+            "description": "Individual field-level errors for programmatic handling",
+            "items": {
+              "type": "object",
+              "properties": {
+                "field": { "type": "string" },
+                "message": { "type": "string" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "responses": {
+      "NotFound": {
+        "description": "Resource not found",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/ErrorResponse" },
+            "example": { "error": "Not found", "code": "NOT_FOUND" }
+          }
+        }
+      },
+      "RateLimited": {
+        "description": "Rate limit exceeded",
+        "headers": {
+          "Retry-After": {
+            "description": "Seconds to wait before retrying",
+            "schema": { "type": "integer", "example": 60 }
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/ErrorResponse" },
+            "example": { "error": "Too many requests. Please slow down.", "code": "RATE_LIMIT", "retry_after_seconds": 60 }
+          }
+        }
+      }
+    }
+  }
+}

@@ -6,7 +6,7 @@ use rocket::State;
 use serde::Serialize;
 
 use crate::db::DbPool;
-use crate::errors::{AppError, ErrorBody};
+use crate::errors::{AppError, ErrorBody, FieldError};
 use crate::guards::admin_token::AdminToken;
 use crate::guards::rate_limit::ReadRateLimit;
 use crate::guards::rate_limit::SubmitRateLimit;
@@ -22,6 +22,8 @@ pub struct PaginationMeta {
     pub per_page: i64,
     pub total: i64,
     pub total_pages: i64,
+    pub has_next: bool,
+    pub has_previous: bool,
 }
 
 #[derive(Serialize)]
@@ -43,6 +45,7 @@ pub struct ListingsQuery<'r> {
     pub sort: Option<&'r str>,
     pub page: Option<i64>,
     pub per_page: Option<i64>,
+    pub featured: Option<bool>,
 }
 
 // ---------------------------------------------------------------------------
@@ -228,7 +231,7 @@ async fn build_public_listing(pool: &DbPool, row: Listing) -> Result<PublicListi
 }
 
 // ---------------------------------------------------------------------------
-// GET /api/listings — paginated, filterable, sortable
+// GET /api/listings -- paginated, filterable, sortable
 // ---------------------------------------------------------------------------
 
 #[get("/listings?<query..>")]
@@ -242,25 +245,35 @@ pub async fn list_listings(
     let offset = (page - 1) * per_page;
 
     // Build the WHERE clause and join clauses dynamically.
-    // We accumulate bind parameters in a Vec<String> and track parameter index.
     let mut param_idx: i32 = 1;
     let mut where_clauses: Vec<String> = vec!["l.status = 'approved'".to_string()];
     let mut join_clauses: Vec<String> = Vec::new();
-
-    // Bind values — we store everything as String and bind them at the end.
-    // To avoid dynamic typing, we use a different approach: build the SQL string
-    // and pass a Vec<Option<String>> of bound values.
     let mut binds: Vec<String> = Vec::new();
 
-    // Category filter
-    if let Some(cat_slug) = query.category {
-        if !cat_slug.trim().is_empty() {
-            join_clauses.push(format!(
-                "INNER JOIN listing_categories _lc ON _lc.listing_id = l.id \
-                 INNER JOIN categories _c ON _c.id = _lc.category_id AND _c.slug = ${p}",
-                p = param_idx
-            ));
-            binds.push(cat_slug.to_string());
+    // Featured filter
+    if let Some(true) = query.featured {
+        where_clauses.push("l.is_featured = true".to_string());
+    }
+
+    // Category filter — accepts slug OR UUID
+    if let Some(cat_val) = query.category {
+        if !cat_val.trim().is_empty() {
+            if uuid::Uuid::parse_str(cat_val).is_ok() {
+                // Filter by UUID
+                join_clauses.push(format!(
+                    "INNER JOIN listing_categories _lc ON _lc.listing_id = l.id \
+                     INNER JOIN categories _c ON _c.id = _lc.category_id AND _c.id = ${p}::uuid",
+                    p = param_idx
+                ));
+            } else {
+                // Filter by slug
+                join_clauses.push(format!(
+                    "INNER JOIN listing_categories _lc ON _lc.listing_id = l.id \
+                     INNER JOIN categories _c ON _c.id = _lc.category_id AND _c.slug = ${p}",
+                    p = param_idx
+                ));
+            }
+            binds.push(cat_val.to_string());
             param_idx += 1;
         }
     }
@@ -278,15 +291,24 @@ pub async fn list_listings(
         }
     }
 
-    // Chain filter
-    if let Some(chain_slug) = query.chain {
-        if !chain_slug.trim().is_empty() {
-            join_clauses.push(format!(
-                "INNER JOIN listing_chains _lch ON _lch.listing_id = l.id \
-                 INNER JOIN chain_support _cs ON _cs.id = _lch.chain_id AND _cs.slug = ${p}",
-                p = param_idx
-            ));
-            binds.push(chain_slug.to_string());
+    // Chain filter — case-insensitive, accepts slug OR UUID
+    if let Some(chain_val) = query.chain {
+        if !chain_val.trim().is_empty() {
+            if uuid::Uuid::parse_str(chain_val).is_ok() {
+                join_clauses.push(format!(
+                    "INNER JOIN listing_chains _lch ON _lch.listing_id = l.id \
+                     INNER JOIN chain_support _cs ON _cs.id = _lch.chain_id AND _cs.id = ${p}::uuid",
+                    p = param_idx
+                ));
+            } else {
+                // Case-insensitive slug match
+                join_clauses.push(format!(
+                    "INNER JOIN listing_chains _lch ON _lch.listing_id = l.id \
+                     INNER JOIN chain_support _cs ON _cs.id = _lch.chain_id AND LOWER(_cs.slug) = LOWER(${p})",
+                    p = param_idx
+                ));
+            }
+            binds.push(chain_val.to_string());
             param_idx += 1;
         }
     }
@@ -314,10 +336,10 @@ pub async fn list_listings(
     }
     let _ = search_bind; // suppress unused warning
 
-    // ORDER BY
+    // ORDER BY — accept "name" as alias for "alpha"
     let order_by = match query.sort.unwrap_or("newest") {
         "views" => "l.view_count DESC",
-        "alpha" => "l.name ASC",
+        "alpha" | "name" => "l.name ASC",
         _ => "l.approved_at DESC NULLS LAST",
     };
 
@@ -330,7 +352,7 @@ pub async fn list_listings(
         joins_sql, where_sql
     );
 
-    // Listings query with LIMIT/OFFSET (param_idx is already beyond filter params)
+    // Listings query with LIMIT/OFFSET
     let limit_p = param_idx;
     let offset_p = param_idx + 1;
     let list_sql = format!(
@@ -384,34 +406,55 @@ pub async fn list_listings(
 
     Ok(Json(PaginatedResponse {
         data,
-        meta: PaginationMeta { page, per_page, total, total_pages },
+        meta: PaginationMeta {
+            page,
+            per_page,
+            total,
+            total_pages,
+            has_next: page < total_pages,
+            has_previous: page > 1,
+        },
     }))
 }
 
 // ---------------------------------------------------------------------------
-// GET /api/listings/<slug> — detail with atomic view increment
+// GET /api/listings/<slug_or_id> -- detail with atomic view increment
 // ---------------------------------------------------------------------------
 
-#[get("/listings/<slug>")]
+#[get("/listings/<slug_or_id>")]
 pub async fn get_listing(
     pool: &State<DbPool>,
-    slug: &str,
+    slug_or_id: &str,
     _rl: ReadRateLimit,
 ) -> Result<Json<PublicListing>, Custom<Json<ErrorBody>>> {
-    // Atomically increment view_count and return the updated row.
-    // Only returns the listing if status = 'approved'.
-    let row = sqlx::query_as::<_, Listing>(
-        "UPDATE listings SET view_count = view_count + 1 \
-         WHERE slug = $1 AND status = 'approved' \
-         RETURNING id, name, slug, short_description, description, \
-                   logo_url, website_url, github_url, docs_url, api_endpoint_url, \
-                   contact_email, status, rejection_note, reputation_score, is_featured, view_count, \
-                   submitted_at, updated_at, approved_at"
-    )
-    .bind(slug)
-    .fetch_optional(pool.inner())
-    .await
-    .map_err(|e| AppError::Db(e).into_response())?;
+    // Try UUID first, then slug
+    let row = if let Ok(id) = uuid::Uuid::parse_str(slug_or_id) {
+        sqlx::query_as::<_, Listing>(
+            "UPDATE listings SET view_count = view_count + 1 \
+             WHERE id = $1 AND status = 'approved' \
+             RETURNING id, name, slug, short_description, description, \
+                       logo_url, website_url, github_url, docs_url, api_endpoint_url, \
+                       contact_email, status, rejection_note, reputation_score, is_featured, view_count, \
+                       submitted_at, updated_at, approved_at"
+        )
+        .bind(id)
+        .fetch_optional(pool.inner())
+        .await
+        .map_err(|e| AppError::Db(e).into_response())?
+    } else {
+        sqlx::query_as::<_, Listing>(
+            "UPDATE listings SET view_count = view_count + 1 \
+             WHERE slug = $1 AND status = 'approved' \
+             RETURNING id, name, slug, short_description, description, \
+                       logo_url, website_url, github_url, docs_url, api_endpoint_url, \
+                       contact_email, status, rejection_note, reputation_score, is_featured, view_count, \
+                       submitted_at, updated_at, approved_at"
+        )
+        .bind(slug_or_id)
+        .fetch_optional(pool.inner())
+        .await
+        .map_err(|e| AppError::Db(e).into_response())?
+    };
 
     match row {
         None => Err(AppError::NotFound.into_response()),
@@ -425,6 +468,77 @@ pub async fn get_listing(
 }
 
 // ---------------------------------------------------------------------------
+// GET /api/health -- health check for agents monitoring the platform
+// ---------------------------------------------------------------------------
+
+#[derive(Serialize)]
+pub struct HealthResponse {
+    pub status: String,
+    pub version: String,
+}
+
+#[get("/health")]
+pub async fn health_check(
+    pool: &State<DbPool>,
+) -> Result<Json<HealthResponse>, Custom<Json<ErrorBody>>> {
+    // Quick DB ping
+    sqlx::query("SELECT 1")
+        .execute(pool.inner())
+        .await
+        .map_err(|e| AppError::Db(e).into_response())?;
+
+    Ok(Json(HealthResponse {
+        status: "ok".to_string(),
+        version: "1.0.0".to_string(),
+    }))
+}
+
+// ---------------------------------------------------------------------------
+// GET /api/submissions/<id>/status -- check submission status
+// ---------------------------------------------------------------------------
+
+#[derive(Serialize)]
+pub struct SubmissionStatusResponse {
+    pub id: uuid::Uuid,
+    pub slug: String,
+    pub status: String,
+    pub submitted_at: chrono::DateTime<chrono::Utc>,
+    pub approved_at: Option<chrono::DateTime<chrono::Utc>>,
+    pub rejection_note: Option<String>,
+}
+
+#[get("/submissions/<id>/status")]
+pub async fn get_submission_status(
+    pool: &State<DbPool>,
+    id: &str,
+) -> Result<Json<SubmissionStatusResponse>, Custom<Json<ErrorBody>>> {
+    let listing_id = uuid::Uuid::parse_str(id)
+        .map_err(|_| AppError::Validation("invalid listing id format".to_string()).into_response())?;
+
+    let row = sqlx::query_as::<_, (uuid::Uuid, String, String, chrono::DateTime<chrono::Utc>, Option<chrono::DateTime<chrono::Utc>>, Option<String>)>(
+        "SELECT id, slug, status, submitted_at, approved_at, rejection_note FROM listings WHERE id = $1"
+    )
+    .bind(listing_id)
+    .fetch_optional(pool.inner())
+    .await
+    .map_err(|e| AppError::Db(e).into_response())?;
+
+    match row {
+        None => Err(AppError::NotFound.into_response()),
+        Some((id, slug, status, submitted_at, approved_at, rejection_note)) => {
+            Ok(Json(SubmissionStatusResponse {
+                id,
+                slug,
+                status,
+                submitted_at,
+                approved_at,
+                rejection_note,
+            }))
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Response types for submit and reputation endpoints
 // ---------------------------------------------------------------------------
 
@@ -433,6 +547,7 @@ pub struct SubmitResponse {
     pub id: uuid::Uuid,
     pub slug: String,
     pub status: String,
+    pub message: String,
     pub submitted_at: chrono::DateTime<chrono::Utc>,
 }
 
@@ -449,7 +564,7 @@ pub struct ReputationResponse {
 }
 
 // ---------------------------------------------------------------------------
-// POST /api/listings — public submission with validation and rate limiting
+// POST /api/listings -- public submission with validation and rate limiting
 // ---------------------------------------------------------------------------
 
 #[post("/listings", data = "<body>")]
@@ -460,30 +575,50 @@ pub async fn submit_listing(
 ) -> Result<rocket::response::status::Created<Json<SubmitResponse>>, Custom<Json<ErrorBody>>> {
     let payload = body.into_inner();
 
-    // --- Validation ---
+    // --- Collect ALL validation errors at once ---
+    let mut errors: Vec<FieldError> = Vec::new();
+
     let name = payload.name.trim().to_string();
     if name.is_empty() || name.len() > 100 {
-        return Err(AppError::Validation("name must be 1-100 characters".to_string()).into_response());
+        errors.push(FieldError {
+            field: "name".to_string(),
+            message: "must be 1-100 characters".to_string(),
+        });
     }
     let short_desc = payload.short_description.trim().to_string();
     if short_desc.is_empty() || short_desc.len() > 140 {
-        return Err(AppError::Validation("short_description must be 1-140 characters".to_string()).into_response());
+        errors.push(FieldError {
+            field: "short_description".to_string(),
+            message: "must be 1-140 characters".to_string(),
+        });
     }
-    if payload.description.trim().len() < 10 {
-        return Err(AppError::Validation("description must be at least 10 characters".to_string()).into_response());
+    let desc_len = payload.description.trim().len();
+    if desc_len < 10 {
+        errors.push(FieldError {
+            field: "description".to_string(),
+            message: "must be at least 10 characters".to_string(),
+        });
     }
-    if payload.description.trim().len() > 10_000 {
-        return Err(AppError::Validation("description must be at most 10,000 characters".to_string()).into_response());
+    if desc_len > 10_000 {
+        errors.push(FieldError {
+            field: "description".to_string(),
+            message: "must be at most 10,000 characters".to_string(),
+        });
     }
     if !payload.website_url.starts_with("https://") {
-        return Err(AppError::Validation("website_url must start with https://".to_string()).into_response());
+        errors.push(FieldError {
+            field: "website_url".to_string(),
+            message: "must start with https://".to_string(),
+        });
     }
     if let Some(ref gh) = payload.github_url {
         if !gh.is_empty() && !gh.starts_with("https://github.com/") {
-            return Err(AppError::Validation("github_url must start with https://github.com/".to_string()).into_response());
+            errors.push(FieldError {
+                field: "github_url".to_string(),
+                message: "must start with https://github.com/".to_string(),
+            });
         }
     }
-    // Validate optional URL fields start with https://
     for (field_name, field_val) in [
         ("logo_url", &payload.logo_url),
         ("docs_url", &payload.docs_url),
@@ -491,19 +626,28 @@ pub async fn submit_listing(
     ] {
         if let Some(ref url) = field_val {
             if !url.is_empty() && !url.starts_with("https://") && !url.starts_with("http://") {
-                return Err(AppError::Validation(format!("{} must start with https:// or http://", field_name)).into_response());
+                errors.push(FieldError {
+                    field: field_name.to_string(),
+                    message: "must start with https:// or http://".to_string(),
+                });
             }
         }
     }
     let email = payload.contact_email.trim().to_string();
     if !email.contains('@') || !email.contains('.') {
-        return Err(AppError::Validation("contact_email must be a valid email address".to_string()).into_response());
+        errors.push(FieldError {
+            field: "contact_email".to_string(),
+            message: "must be a valid email address".to_string(),
+        });
     }
     if payload.categories.is_empty() {
-        return Err(AppError::Validation("at least one category is required".to_string()).into_response());
+        errors.push(FieldError {
+            field: "categories".to_string(),
+            message: "at least one category UUID is required".to_string(),
+        });
     }
 
-    // --- Validate tag format before DB operations ---
+    // Validate tag format
     static TAG_RE: std::sync::LazyLock<regex::Regex> = std::sync::LazyLock::new(|| {
         regex::Regex::new(r"^[a-z0-9][a-z0-9-]{0,59}$").expect("valid regex")
     });
@@ -512,12 +656,23 @@ pub async fn submit_listing(
     for tag_name_raw in &payload.tags {
         let tag_name = tag_name_raw.trim().to_lowercase();
         if tag_name.is_empty() || tag_name.len() > 60 {
-            return Err(AppError::Validation(format!("tag '{}' must be 1-60 characters", tag_name_raw)).into_response());
+            errors.push(FieldError {
+                field: "tags".to_string(),
+                message: format!("tag '{}' must be 1-60 characters", tag_name_raw),
+            });
+        } else if !tag_re.is_match(&tag_name) {
+            errors.push(FieldError {
+                field: "tags".to_string(),
+                message: format!("tag '{}' must be lowercase alphanumeric and hyphens only (e.g. 'my-tag')", tag_name_raw),
+            });
+        } else {
+            validated_tags.push(tag_name);
         }
-        if !tag_re.is_match(&tag_name) {
-            return Err(AppError::Validation(format!("tag '{}' must be lowercase alphanumeric and hyphens only", tag_name_raw)).into_response());
-        }
-        validated_tags.push(tag_name);
+    }
+
+    // Return all errors at once if any
+    if !errors.is_empty() {
+        return Err(AppError::ValidationErrors(errors).into_response());
     }
 
     // --- Generate slug ---
@@ -525,7 +680,7 @@ pub async fn submit_listing(
         .await
         .map_err(|e| AppError::Db(e).into_response())?;
 
-    // --- All DB writes wrapped in a transaction to prevent orphaned listings ---
+    // --- All DB writes wrapped in a transaction ---
     let mut tx = pool.inner().begin()
         .await
         .map_err(|e| AppError::Db(e).into_response())?;
@@ -645,6 +800,7 @@ pub async fn submit_listing(
         id: listing_id,
         slug: slug.clone(),
         status: "pending".to_string(),
+        message: "Your listing has been submitted and is pending admin review. Use GET /api/submissions/<id>/status to check its status.".to_string(),
         submitted_at,
     };
 
@@ -654,12 +810,9 @@ pub async fn submit_listing(
 }
 
 // ---------------------------------------------------------------------------
-// PATCH /api/listings/:id/reputation — stubbed admin endpoint
+// PATCH /api/listings/:id/reputation -- stubbed admin endpoint
 // ---------------------------------------------------------------------------
 
-/// PATCH /api/listings/:id/reputation
-/// Stubbed endpoint — accepts a score payload, stores it, returns stubbed response.
-/// Protected by AdminToken guard. For future reputation scoring service integration.
 #[patch("/listings/<id>/reputation", data = "<body>")]
 pub async fn patch_reputation(
     pool: &State<DbPool>,
@@ -672,12 +825,10 @@ pub async fn patch_reputation(
 
     let score = body.into_inner().score;
 
-    // Validate score range: 0.00–100.00
     if !(0.0..=100.0).contains(&score) {
         return Err(AppError::Validation("reputation_score must be between 0.00 and 100.00".to_string()).into_response());
     }
 
-    // Store the score (stubbed — in production this comes from the scoring service)
     let updated: Option<uuid::Uuid> = sqlx::query_scalar(
         "UPDATE listings SET reputation_score = $1, updated_at = now() WHERE id = $2 RETURNING id"
     )
@@ -694,6 +845,6 @@ pub async fn patch_reputation(
     Ok(Json(ReputationResponse {
         id: listing_id,
         reputation_score: Some(score),
-        message: "Reputation score updated (stubbed — scoring service integration pending)".to_string(),
+        message: "Reputation score updated (stubbed -- scoring service integration pending)".to_string(),
     }))
 }

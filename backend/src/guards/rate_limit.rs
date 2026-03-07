@@ -17,7 +17,7 @@ type Limiter = Arc<RateLimiter<NotKeyed, InMemoryState, DefaultClock>>;
 pub struct ReadRateLimiters(pub DashMap<IpAddr, Limiter>);
 
 /// Managed state: map from IP -> per-IP rate limiter for submission endpoint.
-/// 3 requests per hour per IP.
+/// 30 requests per hour per IP.
 pub struct SubmitRateLimiters(pub DashMap<IpAddr, Limiter>);
 
 impl ReadRateLimiters {
@@ -46,7 +46,7 @@ impl AdminRateLimiters {
 /// Add `_rl: ReadRateLimit` as a parameter to any GET handler to protect it.
 pub struct ReadRateLimit;
 
-/// Request guard that enforces submit rate limit (3/hour per IP).
+/// Request guard that enforces submit rate limit (30/hour per IP).
 /// Add `_rl: SubmitRateLimit` as a parameter to POST /api/listings handler.
 pub struct SubmitRateLimit;
 
@@ -122,13 +122,13 @@ impl<'r> FromRequest<'r> for SubmitRateLimit {
             None => return Outcome::Success(SubmitRateLimit), // fail open
         };
 
-        // Get or create per-IP limiter: 3 requests per hour
+        // Get or create per-IP limiter: 30 requests per hour
         let limiter = limiters
             .0
             .entry(ip)
             .or_insert_with(|| {
                 Arc::new(RateLimiter::direct(
-                    Quota::per_hour(NonZeroU32::new(3).unwrap()),
+                    Quota::per_hour(NonZeroU32::new(30).unwrap()),
                 ))
             })
             .clone();

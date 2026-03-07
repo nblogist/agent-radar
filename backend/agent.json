@@ -1,0 +1,59 @@
+{
+  "schema_version": "1.0",
+  "name": "AgentRadar",
+  "description": "AI-first agent application directory for discovering and listing AI agent tools and services across multiple blockchain ecosystems.",
+  "capabilities": {
+    "search": {
+      "description": "Full-text search across agent tool listings by name, description, category, chain, and tags",
+      "endpoint": "/api/listings",
+      "method": "GET",
+      "parameters": ["search", "category", "chain", "tag", "sort", "page", "per_page", "featured"]
+    },
+    "detail": {
+      "description": "Get detailed information about a specific agent tool by slug or UUID",
+      "endpoint": "/api/listings/{slug_or_id}",
+      "method": "GET"
+    },
+    "submit": {
+      "description": "Submit a new agent tool for listing in the directory (pending admin review)",
+      "endpoint": "/api/listings",
+      "method": "POST",
+      "content_type": "application/json",
+      "rate_limit": "30 requests per hour per IP"
+    },
+    "submission_status": {
+      "description": "Check the review status of a submitted listing",
+      "endpoint": "/api/submissions/{id}/status",
+      "method": "GET"
+    },
+    "metadata": {
+      "categories": {
+        "description": "List all available categories with UUIDs for filtering and submission",
+        "endpoint": "/api/categories",
+        "method": "GET"
+      },
+      "chains": {
+        "description": "List all supported blockchain chains with UUIDs",
+        "endpoint": "/api/chains",
+        "method": "GET"
+      },
+      "tags": {
+        "description": "List all tags with listing counts",
+        "endpoint": "/api/tags",
+        "method": "GET"
+      }
+    }
+  },
+  "api_spec": "/api/openapi.json",
+  "authentication": {
+    "public_endpoints": "All GET endpoints and POST /api/listings are public (no auth required)",
+    "admin_endpoints": "Admin endpoints at /api/admin/* require Authorization: Bearer <token> header"
+  },
+  "rate_limits": {
+    "read": "60 requests per minute per IP",
+    "submit": "30 requests per hour per IP",
+    "admin": "5 requests per minute per IP"
+  },
+  "response_format": "application/json",
+  "cors": "Enabled for all origins"
+}
