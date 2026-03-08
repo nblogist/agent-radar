@@ -19,7 +19,7 @@ use rocket::serde::json::Json;
 use rocket::response::{self, Responder};
 
 use crate::errors::ErrorBody;
-use crate::guards::rate_limit::{AdminRateLimiters, ReadRateLimiters, SubmitRateLimiters};
+use crate::guards::rate_limit::{ReadRateLimiters, SubmitRateLimiters};
 
 /// Custom responder that adds Retry-After header to 429 responses.
 struct RateLimitError;
@@ -195,7 +195,7 @@ async fn rocket() -> _ {
         .manage(pool)
         .manage(ReadRateLimiters::new())
         .manage(SubmitRateLimiters::new())
-        .manage(AdminRateLimiters::new())
+
         .register("/", catchers![
             unauthorized_catcher,
             rate_limit_catcher,

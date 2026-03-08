@@ -32,16 +32,6 @@ impl SubmitRateLimiters {
     }
 }
 
-/// Managed state: map from IP -> per-IP rate limiter for admin endpoints.
-/// 5 requests per minute per IP — aggressive to deter brute force.
-pub struct AdminRateLimiters(pub DashMap<IpAddr, Limiter>);
-
-impl AdminRateLimiters {
-    pub fn new() -> Self {
-        AdminRateLimiters(DashMap::new())
-    }
-}
-
 /// Request guard that enforces read rate limit (60/min per IP).
 /// Add `_rl: ReadRateLimit` as a parameter to any GET handler to protect it.
 pub struct ReadRateLimit;
