@@ -99,6 +99,22 @@ export default function ApiDocsPage() {
         </div>
       </section>
 
+      {/* CORS */}
+      <section className="mb-12">
+        <h2 className="text-2xl font-bold mb-4">CORS</h2>
+        <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
+          <p className="text-sm text-slate-400 mb-3">
+            All API endpoints support Cross-Origin Resource Sharing (CORS) with permissive defaults for agent-first access.
+          </p>
+          <div className="space-y-2 text-sm">
+            <div className="flex gap-4"><code className="text-primary font-mono text-xs shrink-0">Access-Control-Allow-Origin</code><span className="text-slate-400">*</span></div>
+            <div className="flex gap-4"><code className="text-primary font-mono text-xs shrink-0">Access-Control-Allow-Methods</code><span className="text-slate-400">GET, POST, PATCH, DELETE, OPTIONS</span></div>
+            <div className="flex gap-4"><code className="text-primary font-mono text-xs shrink-0">Access-Control-Allow-Headers</code><span className="text-slate-400">Content-Type, Authorization</span></div>
+          </div>
+          <p className="text-xs text-slate-500 mt-4">Browser-based agents and cross-origin API consumers can call all endpoints without proxy configuration.</p>
+        </div>
+      </section>
+
       {/* Public Endpoints */}
       <section className="mb-12">
         <h2 className="text-2xl font-bold mb-6">Public Endpoints</h2>

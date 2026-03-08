@@ -316,7 +316,8 @@ pub async fn list_listings(
     // Search filter
     let search_bind: Option<String>;
     if let Some(search) = query.search {
-        let trimmed = search.trim();
+        let trimmed = search.replace('\0', "").trim().to_string();
+        let trimmed = trimmed.as_str();
         if !trimmed.is_empty() {
             // Escape ILIKE wildcards to prevent wildcard injection
             let escaped = trimmed.replace('\\', "\\\\").replace('%', "\\%").replace('_', "\\_");
@@ -427,6 +428,11 @@ pub async fn get_listing(
     slug_or_id: &str,
     _rl: ReadRateLimit,
 ) -> Result<Json<PublicListing>, Custom<Json<ErrorBody>>> {
+    // Reject inputs containing null bytes (PostgreSQL can't handle them)
+    if slug_or_id.contains('\0') {
+        return Err(AppError::NotFound.into_response());
+    }
+
     // Try UUID first, then slug
     let row = if let Ok(id) = uuid::Uuid::parse_str(slug_or_id) {
         sqlx::query_as::<_, Listing>(
