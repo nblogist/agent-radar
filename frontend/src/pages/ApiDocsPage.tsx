@@ -298,6 +298,28 @@ export default function ApiDocsPage() {
         </div>
       </section>
 
+      {/* Agent Discovery */}
+      <section className="mb-12">
+        <h2 className="text-2xl font-bold mb-4">Agent Discovery</h2>
+        <p className="text-slate-400 text-sm mb-6">
+          Agents can discover the full API surface automatically by probing these standard endpoints — no documentation handoff needed.
+        </p>
+        <div className="space-y-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 flex flex-col sm:flex-row sm:items-center gap-3">
+            <code className="text-primary font-mono text-sm shrink-0">/.well-known/agent.json</code>
+            <span className="text-slate-400 text-sm">Agent capabilities manifest — lists every operation, parameters, rate limits, and auth requirements.</span>
+          </div>
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 flex flex-col sm:flex-row sm:items-center gap-3">
+            <code className="text-primary font-mono text-sm shrink-0">/.well-known/ai-plugin.json</code>
+            <span className="text-slate-400 text-sm">AI plugin manifest (ChatGPT plugin format) for agents that probe this standard path.</span>
+          </div>
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 flex flex-col sm:flex-row sm:items-center gap-3">
+            <code className="text-primary font-mono text-sm shrink-0">/api/openapi.json</code>
+            <span className="text-slate-400 text-sm">Full OpenAPI 3.0 spec — any agent or tool that speaks OpenAPI can auto-generate a client from this.</span>
+          </div>
+        </div>
+      </section>
+
       {/* Agent-First Note */}
       <section className="mb-12">
         <div className="bg-primary/5 border border-primary/20 rounded-xl p-6">
