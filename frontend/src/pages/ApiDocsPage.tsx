@@ -92,7 +92,7 @@ export default function ApiDocsPage() {
             </div>
             <div>
               <p className="text-sm text-slate-500 mb-1">Submit endpoint (POST)</p>
-              <p className="text-lg font-bold">3 requests / hour</p>
+              <p className="text-lg font-bold">30 requests / hour</p>
             </div>
           </div>
           <p className="text-xs text-slate-500 mt-4">Rate limits are per IP address. Exceeding the limit returns <code className="text-slate-400">429 Too Many Requests</code>.</p>
@@ -193,7 +193,7 @@ export default function ApiDocsPage() {
             method="POST"
             path="/api/listings"
             description="Submit a new listing for review. The listing will be set to 'pending' status until an admin approves it."
-            rateLimit="3/hour"
+            rateLimit="30/hour"
             body={`{
   "name": "My Agent Tool",          // required, 1-100 chars
   "short_description": "Brief...",   // required, 1-140 chars

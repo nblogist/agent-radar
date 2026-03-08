@@ -7,6 +7,22 @@ import MarkdownRenderer from '../components/MarkdownRenderer';
 
 const filledStyle = { fontVariationSettings: "'FILL' 1" };
 
+type FieldErrors = Record<string, string>;
+
+function FieldError({ error }: { error?: string }) {
+  if (!error) return null;
+  return (
+    <p className="text-red-400 text-xs mt-1.5 flex items-center gap-1">
+      <span className="material-symbols-outlined text-xs">error</span>
+      {error}
+    </p>
+  );
+}
+
+function inputBorder(error?: string) {
+  return error ? 'border-red-500/50' : 'border-white/10';
+}
+
 export default function SubmitPage() {
   const { data: categories } = useQuery({ queryKey: ['categories'], queryFn: fetchCategories });
   const { data: chains } = useQuery({ queryKey: ['chains'], queryFn: fetchChains });
@@ -28,7 +44,8 @@ export default function SubmitPage() {
   const [suggestedChains, setSuggestedChains] = useState<string[]>([]);
   const [chainSuggestionInput, setChainSuggestionInput] = useState('');
   const [chainSuggestionError, setChainSuggestionError] = useState('');
-  const [logoError, setLogoError] = useState('');
+  const [logoWarning, setLogoWarning] = useState('');
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [formError, setFormError] = useState('');
   const [showPreview, setShowPreview] = useState(false);
 
@@ -55,6 +72,7 @@ export default function SubmitPage() {
 
   function toggleCategory(id: string) {
     setSelectedCategories(prev => prev.includes(id) ? prev.filter(c => c !== id) : [...prev, id]);
+    setFieldErrors(prev => { const { categories: _, ...rest } = prev; return rest; });
   }
 
   function toggleChain(id: string) {
@@ -69,13 +87,11 @@ export default function SubmitPage() {
       setChainSuggestionError('Chain name must be 100 characters or less.');
       return;
     }
-    // Check duplicate against existing chains (case-insensitive)
     const existingMatch = (chains ?? []).find(c => c.name.toLowerCase() === name.toLowerCase());
     if (existingMatch) {
       setChainSuggestionError(`"${existingMatch.name}" already exists — select it from the list above instead.`);
       return;
     }
-    // Check duplicate against already-suggested chains
     if (suggestedChains.some(s => s.toLowerCase() === name.toLowerCase())) {
       setChainSuggestionError(`"${name}" has already been added to your suggestions.`);
       return;
@@ -84,34 +100,79 @@ export default function SubmitPage() {
     setChainSuggestionInput('');
   }
 
+  function isValidUrl(url: string): boolean {
+    try {
+      const u = new URL(url);
+      return (u.protocol === 'https:' || u.protocol === 'http:') && /\.[a-zA-Z]{2,}$/.test(u.hostname);
+    } catch {
+      return false;
+    }
+  }
+
+  function validate(): FieldErrors {
+    const errors: FieldErrors = {};
+
+    if (!contactEmail.trim()) {
+      errors.email = 'Email is required.';
+    } else if (!/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(contactEmail)) {
+      errors.email = 'Enter a valid email (e.g. you@example.com).';
+    }
+
+    if (!name.trim()) errors.name = 'Listing name is required.';
+
+    if (!websiteUrl.trim()) {
+      errors.website = 'Website URL is required.';
+    } else if (!websiteUrl.startsWith('https://')) {
+      errors.website = 'Must start with https://';
+    } else if (!isValidUrl(websiteUrl)) {
+      errors.website = 'Enter a valid URL (e.g. https://example.com).';
+    }
+
+    if (!shortDesc.trim()) errors.shortDesc = 'Short description is required.';
+
+    if (description.trim().length < 10) {
+      errors.description = 'Must be at least 10 characters.';
+    }
+
+    if (logoUrl && !isValidUrl(logoUrl)) {
+      errors.logo = 'Enter a valid URL (e.g. https://example.com/logo.png).';
+    }
+
+    if (githubUrl) {
+      if (!githubUrl.startsWith('https://github.com/')) {
+        errors.github = 'Must start with https://github.com/';
+      } else if (!isValidUrl(githubUrl)) {
+        errors.github = 'Enter a valid GitHub URL.';
+      }
+    }
+
+    if (docsUrl && !isValidUrl(docsUrl)) {
+      errors.docs = 'Enter a valid URL (e.g. https://docs.example.com).';
+    }
+
+    if (apiEndpointUrl && !isValidUrl(apiEndpointUrl)) {
+      errors.api = 'Enter a valid URL (e.g. https://api.example.com).';
+    }
+
+    if (selectedCategories.length === 0) {
+      errors.categories = 'Select at least one category.';
+    }
+
+    return errors;
+  }
+
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setFormError('');
 
-    if (selectedCategories.length === 0) {
-      setFormError('Please select at least one category.');
-      return;
-    }
+    const errors = validate();
+    setFieldErrors(errors);
 
-    if (!websiteUrl.startsWith('https://')) {
-      setFormError('Website URL must start with https://');
-      return;
-    }
-
-    if (githubUrl && !githubUrl.startsWith('https://github.com/')) {
-      setFormError('GitHub URL must start with https://github.com/');
-      return;
-    }
-
-    for (const [label, url] of [['Logo URL', logoUrl], ['Docs URL', docsUrl], ['API Endpoint', apiEndpointUrl]] as const) {
-      if (url && !url.startsWith('https://') && !url.startsWith('http://')) {
-        setFormError(`${label} must start with https:// or http://`);
-        return;
-      }
-    }
-
-    if (description.trim().length < 10) {
-      setFormError('Description must be at least 10 characters.');
+    if (Object.keys(errors).length > 0) {
+      // Scroll to first error
+      const firstErrorKey = Object.keys(errors)[0];
+      const el = document.querySelector(`[data-field="${firstErrorKey}"]`);
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
       return;
     }
 
@@ -132,6 +193,11 @@ export default function SubmitPage() {
     if (suggestedChains.length > 0) payload.suggested_chains = suggestedChains;
 
     mutation.mutate(payload);
+  }
+
+  // Clear field error on change
+  function clearError(field: string) {
+    setFieldErrors(prev => { const { [field]: _, ...rest } = prev; return rest; });
   }
 
   // Success state
@@ -157,7 +223,7 @@ export default function SubmitPage() {
               Browse Directory
             </Link>
             <button
-              onClick={() => { mutation.reset(); setName(''); setShortDesc(''); setDescription(''); setWebsiteUrl(''); setLogoUrl(''); setGithubUrl(''); setDocsUrl(''); setApiEndpointUrl(''); setContactEmail(''); setSelectedCategories([]); setSelectedChains([]); setTags([]); setSuggestedChains([]); }}
+              onClick={() => { mutation.reset(); setName(''); setShortDesc(''); setDescription(''); setWebsiteUrl(''); setLogoUrl(''); setGithubUrl(''); setDocsUrl(''); setApiEndpointUrl(''); setContactEmail(''); setSelectedCategories([]); setSelectedChains([]); setTags([]); setSuggestedChains([]); setFieldErrors({}); }}
               className="bg-slate-800 text-white px-8 py-3 rounded-lg font-bold hover:bg-slate-700 transition-colors"
             >
               Submit Another
@@ -182,7 +248,7 @@ export default function SubmitPage() {
             </div>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-0">
+          <form onSubmit={handleSubmit} className="space-y-0" noValidate>
             {/* Section 1: Contact Info */}
             <div className="flex items-center gap-4 mb-8">
               <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-primary">
@@ -191,19 +257,19 @@ export default function SubmitPage() {
               <h2 className="text-xl font-bold">1. Contact Information</h2>
             </div>
             <div className="bg-dark-surface p-4 sm:p-8 rounded-2xl border border-white/10 shadow-xl space-y-6">
-              <div>
+              <div data-field="email">
                 <label className="block text-sm font-bold mb-2 text-slate-300">
                   Contact Email<span className="text-primary ml-1">*</span>
                   <span className="text-slate-500 font-normal ml-2 text-[10px]">(Internal only — not displayed publicly)</span>
                 </label>
                 <input
-                  className="w-full bg-dark-bg border-white/10 rounded-xl px-4 py-3 focus:ring-primary focus:border-primary text-sm text-slate-100 placeholder-slate-500 border"
+                  className={`w-full bg-dark-bg rounded-xl px-4 py-3 focus:ring-primary focus:border-primary text-sm text-slate-100 placeholder-slate-500 border ${inputBorder(fieldErrors.email)}`}
                   placeholder="dev@example.com"
-                  required
-                  type="email"
+                  type="text"
                   value={contactEmail}
-                  onChange={e => setContactEmail(e.target.value)}
+                  onChange={e => { setContactEmail(e.target.value); clearError('email'); }}
                 />
+                <FieldError error={fieldErrors.email} />
               </div>
             </div>
 
@@ -216,45 +282,51 @@ export default function SubmitPage() {
             </div>
             <div className="bg-dark-surface p-4 sm:p-8 rounded-2xl border border-white/10 shadow-xl space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="col-span-2 md:col-span-1">
+                <div className="col-span-2 md:col-span-1" data-field="name">
                   <label className="block text-sm font-bold mb-2 text-slate-300">Listing Name<span className="text-primary ml-1">*</span></label>
                   <input
-                    className="w-full bg-dark-bg border-white/10 rounded-xl px-4 py-3 focus:ring-primary focus:border-primary text-sm text-slate-100 placeholder-slate-500 border"
+                    className={`w-full bg-dark-bg rounded-xl px-4 py-3 focus:ring-primary focus:border-primary text-sm text-slate-100 placeholder-slate-500 border ${inputBorder(fieldErrors.name)}`}
                     placeholder="e.g., Nova Sentry"
-                    required
                     type="text"
                     maxLength={100}
                     value={name}
-                    onChange={e => setName(e.target.value)}
+                    onChange={e => { setName(e.target.value); clearError('name'); }}
                   />
+                  <FieldError error={fieldErrors.name} />
                 </div>
-                <div className="col-span-2 md:col-span-1">
+                <div className="col-span-2 md:col-span-1" data-field="website">
                   <label className="block text-sm font-bold mb-2 text-slate-300">Website URL<span className="text-primary ml-1">*</span></label>
                   <input
-                    className="w-full bg-dark-bg border-white/10 rounded-xl px-4 py-3 focus:ring-primary focus:border-primary text-sm text-slate-100 placeholder-slate-500 border"
+                    className={`w-full bg-dark-bg rounded-xl px-4 py-3 focus:ring-primary focus:border-primary text-sm text-slate-100 placeholder-slate-500 border ${inputBorder(fieldErrors.website)}`}
                     placeholder="https://myproject.ai"
-                    required
-                    type="url"
+                    type="text"
                     value={websiteUrl}
-                    onChange={e => setWebsiteUrl(e.target.value)}
+                    onChange={e => { setWebsiteUrl(e.target.value); clearError('website'); }}
+                    onBlur={e => {
+                      const v = e.target.value.trim();
+                      if (v && !v.startsWith('http://') && !v.startsWith('https://')) {
+                        setWebsiteUrl('https://' + v);
+                      }
+                    }}
                   />
+                  <FieldError error={fieldErrors.website} />
                 </div>
-                <div className="col-span-2">
+                <div className="col-span-2" data-field="shortDesc">
                   <label className="block text-sm font-bold mb-2 text-slate-300">
                     Short Description<span className="text-primary ml-1">*</span>
                     <span className="text-slate-500 font-normal ml-2 text-[10px]">({shortDesc.length}/140)</span>
                   </label>
                   <input
-                    className="w-full bg-dark-bg border-white/10 rounded-xl px-4 py-3 focus:ring-primary focus:border-primary text-sm text-slate-100 placeholder-slate-500 border"
+                    className={`w-full bg-dark-bg rounded-xl px-4 py-3 focus:ring-primary focus:border-primary text-sm text-slate-100 placeholder-slate-500 border ${inputBorder(fieldErrors.shortDesc)}`}
                     placeholder="One-liner for card previews (max 140 chars)"
-                    required
                     type="text"
                     maxLength={140}
                     value={shortDesc}
-                    onChange={e => setShortDesc(e.target.value)}
+                    onChange={e => { setShortDesc(e.target.value); clearError('shortDesc'); }}
                   />
+                  <FieldError error={fieldErrors.shortDesc} />
                 </div>
-                <div className="col-span-2">
+                <div className="col-span-2" data-field="description">
                   <div className="flex items-center justify-between mb-2">
                     <label className="text-sm font-bold text-slate-300">
                       Full Description<span className="text-primary ml-1">*</span>
@@ -277,89 +349,94 @@ export default function SubmitPage() {
                     </div>
                   ) : (
                     <textarea
-                      className="w-full bg-dark-bg border-white/10 rounded-xl px-4 py-3 focus:ring-primary focus:border-primary text-sm text-slate-100 placeholder-slate-500 border min-h-[120px]"
+                      className={`w-full bg-dark-bg rounded-xl px-4 py-3 focus:ring-primary focus:border-primary text-sm text-slate-100 placeholder-slate-500 border min-h-[120px] ${inputBorder(fieldErrors.description)}`}
                       placeholder="Detailed description of your tool or service. Supports **bold**, *italic*, ## headings, - lists, and more."
-                      required
                       minLength={10}
                       value={description}
-                      onChange={e => setDescription(e.target.value)}
+                      onChange={e => { setDescription(e.target.value); clearError('description'); }}
                     />
                   )}
+                  <FieldError error={fieldErrors.description} />
                 </div>
-                <div className="col-span-2 md:col-span-1">
+                <div className="col-span-2 md:col-span-1" data-field="logo">
                   <label className="block text-sm font-bold mb-2 text-slate-300">
                     Logo URL <span className="text-slate-400 font-normal ml-1 text-xs">(Optional)</span>
                   </label>
                   <input
-                    className={`w-full bg-dark-bg border rounded-xl px-4 py-3 focus:ring-primary focus:border-primary text-sm text-slate-100 placeholder-slate-500 ${logoError ? 'border-red-500/50' : 'border-white/10'}`}
+                    className={`w-full bg-dark-bg border rounded-xl px-4 py-3 focus:ring-primary focus:border-primary text-sm text-slate-100 placeholder-slate-500 ${fieldErrors.logo ? 'border-red-500/50' : logoWarning ? 'border-amber-500/50' : 'border-white/10'}`}
                     placeholder="https://example.com/logo.png"
-                    type="url"
+                    type="text"
                     value={logoUrl}
                     onChange={e => {
                       const url = e.target.value;
                       setLogoUrl(url);
-                      setLogoError('');
+                      setLogoWarning('');
+                      clearError('logo');
                       if (url && !url.match(/\.(png|jpg|jpeg|svg|webp)(\?.*)?$/i) && !url.match(/^https?:\/\/.+/)) {
-                        setLogoError('URL must point to a PNG, JPG, SVG, or WebP image.');
+                        setLogoWarning('URL must point to a PNG, JPG, SVG, or WebP image.');
                       }
                     }}
                     onBlur={() => {
                       if (logoUrl && !logoUrl.match(/\.(png|jpg|jpeg|svg|webp)(\?.*)?$/i)) {
-                        setLogoError('URL should end in .png, .jpg, .svg, or .webp for best results.');
+                        setLogoWarning('URL should end in .png, .jpg, .svg, or .webp for best results.');
                       }
                     }}
                   />
-                  {logoError && (
+                  <FieldError error={fieldErrors.logo} />
+                  {!fieldErrors.logo && logoWarning && (
                     <p className="text-amber-500 text-xs mt-1.5 flex items-center gap-1">
                       <span className="material-symbols-outlined text-xs">warning</span>
-                      {logoError}
+                      {logoWarning}
                     </p>
                   )}
                   <p className="text-slate-500 text-[10px] mt-1.5 leading-relaxed">
                     Square icon recommended (min 128x128px). Accepted formats: PNG, JPG, SVG, WebP. Max 500KB.
                   </p>
                 </div>
-                <div className="col-span-2 md:col-span-1">
+                <div className="col-span-2 md:col-span-1" data-field="github">
                   <label className="block text-sm font-bold mb-2 text-slate-300">
                     GitHub URL <span className="text-slate-400 font-normal ml-1 text-xs">(Optional)</span>
                   </label>
                   <input
-                    className="w-full bg-dark-bg border-white/10 rounded-xl px-4 py-3 focus:ring-primary focus:border-primary text-sm text-slate-100 placeholder-slate-500 border"
+                    className={`w-full bg-dark-bg rounded-xl px-4 py-3 focus:ring-primary focus:border-primary text-sm text-slate-100 placeholder-slate-500 border ${inputBorder(fieldErrors.github)}`}
                     placeholder="https://github.com/your-org/repo"
-                    type="url"
+                    type="text"
                     value={githubUrl}
-                    onChange={e => setGithubUrl(e.target.value)}
+                    onChange={e => { setGithubUrl(e.target.value); clearError('github'); }}
                   />
+                  <FieldError error={fieldErrors.github} />
                 </div>
-                <div className="col-span-2 md:col-span-1">
+                <div className="col-span-2 md:col-span-1" data-field="docs">
                   <label className="block text-sm font-bold mb-2 text-slate-300">
                     Docs URL <span className="text-slate-400 font-normal ml-1 text-xs">(Optional)</span>
                   </label>
                   <input
-                    className="w-full bg-dark-bg border-white/10 rounded-xl px-4 py-3 focus:ring-primary focus:border-primary text-sm text-slate-100 placeholder-slate-500 border"
+                    className={`w-full bg-dark-bg rounded-xl px-4 py-3 focus:ring-primary focus:border-primary text-sm text-slate-100 placeholder-slate-500 border ${inputBorder(fieldErrors.docs)}`}
                     placeholder="https://docs.myproject.ai"
-                    type="url"
+                    type="text"
                     value={docsUrl}
-                    onChange={e => setDocsUrl(e.target.value)}
+                    onChange={e => { setDocsUrl(e.target.value); clearError('docs'); }}
                   />
+                  <FieldError error={fieldErrors.docs} />
                 </div>
-                <div className="col-span-2 md:col-span-1">
+                <div className="col-span-2 md:col-span-1" data-field="api">
                   <label className="block text-sm font-bold mb-2 text-slate-300">
                     API Endpoint <span className="text-slate-400 font-normal ml-1 text-xs">(Optional)</span>
                   </label>
                   <input
-                    className="w-full bg-dark-bg border-white/10 rounded-xl px-4 py-3 focus:ring-primary focus:border-primary text-sm text-slate-100 placeholder-slate-500 border"
+                    className={`w-full bg-dark-bg rounded-xl px-4 py-3 focus:ring-primary focus:border-primary text-sm text-slate-100 placeholder-slate-500 border ${inputBorder(fieldErrors.api)}`}
                     placeholder="https://api.myproject.ai"
-                    type="url"
+                    type="text"
                     value={apiEndpointUrl}
-                    onChange={e => setApiEndpointUrl(e.target.value)}
+                    onChange={e => { setApiEndpointUrl(e.target.value); clearError('api'); }}
                   />
+                  <FieldError error={fieldErrors.api} />
                 </div>
 
                 {/* Category selection */}
-                <div className="col-span-2">
+                <div className="col-span-2" data-field="categories">
                   <label className="block text-sm font-bold mb-2 text-slate-300">Category<span className="text-primary ml-1">*</span></label>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                  <div className={`grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 ${fieldErrors.categories ? 'ring-1 ring-red-500/30 rounded-xl p-2 -m-2' : ''}`}>
                     {(categories ?? []).map(cat => (
                       <button
                         key={cat.id}
@@ -375,6 +452,7 @@ export default function SubmitPage() {
                       </button>
                     ))}
                   </div>
+                  <FieldError error={fieldErrors.categories} />
                 </div>
 
                 {/* Tags input */}
@@ -421,31 +499,35 @@ export default function SubmitPage() {
                       key={chain.id}
                       onClick={() => toggleChain(chain.id)}
                       className={`border p-4 rounded-xl flex items-center gap-3 cursor-pointer transition-all relative overflow-hidden ${
-                        chain.is_featured && isSelected
-                          ? 'border-amber-500/50 bg-amber-500/5 ring-1 ring-amber-500/50'
-                          : isSelected
-                            ? 'border-primary bg-primary/10 ring-1 ring-primary'
-                            : 'border-white/10 bg-white/5 hover:border-primary'
+                        isSelected
+                          ? chain.is_featured
+                            ? 'border-amber-500/50 bg-amber-500/5 ring-1 ring-amber-500/50'
+                            : 'border-primary bg-primary/10 ring-1 ring-primary'
+                          : 'border-white/10 bg-white/5 hover:border-primary'
                       }`}
                     >
                       {chain.is_featured && (
-                        <div className="absolute top-3 right-3 bg-amber-500/10 text-amber-500 border border-amber-500/20 text-[10px] px-2.5 py-1 rounded-md font-bold uppercase tracking-wider flex items-center gap-1 shadow-sm">
+                        <div className={`absolute top-3 right-3 text-[10px] px-2.5 py-1 rounded-md font-bold uppercase tracking-wider flex items-center gap-1 shadow-sm ${
+                          isSelected
+                            ? 'bg-amber-500/10 text-amber-500 border border-amber-500/20'
+                            : 'bg-slate-700/50 text-slate-400 border border-slate-600/30'
+                        }`}>
                           <span className="material-symbols-outlined !text-[10px]" style={filledStyle}>stars</span>
                           Featured
                         </div>
                       )}
                       <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                        chain.is_featured ? 'bg-amber-500/20' : 'bg-slate-800'
+                        chain.is_featured && isSelected ? 'bg-amber-500/20' : 'bg-slate-800'
                       }`}>
                         <span className={`material-symbols-outlined text-2xl ${
-                          chain.is_featured ? 'text-amber-500' : 'text-slate-400'
+                          chain.is_featured && isSelected ? 'text-amber-500' : isSelected ? 'text-primary' : 'text-slate-400'
                         }`}>
                           {chain.is_featured ? 'toll' : 'link'}
                         </span>
                       </div>
                       <div>
                         <div className="text-sm font-bold">{chain.name}</div>
-                        {chain.is_featured && (
+                        {chain.is_featured && isSelected && (
                           <div className="text-[9px] text-amber-500 font-bold uppercase tracking-tight">Cost-Efficient</div>
                         )}
                       </div>
@@ -499,7 +581,7 @@ export default function SubmitPage() {
               </div>
             </div>
 
-            {/* Error message */}
+            {/* Server error */}
             {(formError || mutation.error) && (
               <div className="mt-6 p-4 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-sm">
                 {formError || (mutation.error instanceof Error ? mutation.error.message : 'Submission failed. Please try again.')}

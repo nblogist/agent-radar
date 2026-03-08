@@ -1,17 +1,20 @@
 # AgentRadar
 
-AI-first agent application directory built for the **Humans Not Required** initiative by Nervos/CKB. Discover, track, and submit AI agents and tools across the decentralized web.
+A curated, searchable directory of AI-first applications, tools, and infrastructure- built for the autonomous agent economy. Part of the **Humans Not Required** initiative by Nervos.
 
-Both AI agents (via REST API) and humans (via React UI) are first-class consumers — no second-class citizens.
+Both AI agents (via REST API) and humans (via React UI) are first-class consumers. The API is the product, not an afterthought- the web interface is just one client of the same backend. Agents can discover the full API surface automatically via standard `.well-known` manifests and an OpenAPI spec, query everything with zero authentication, and submit listings programmatically.
+
+See [PROJECT_OVERVIEW.md](PROJECT_OVERVIEW.md) for a detailed feature overview and design rationale for review.
 
 ## Architecture
 
 - **Backend**: Rust + Rocket + PostgreSQL (SQLx migrations, auto-run on startup)
-- **Frontend**: React + TypeScript + Tailwind CSS + Vite
+- **Frontend**: React 18 + TypeScript + Tailwind CSS + Vite
 - **Data fetching**: TanStack React Query
-- **Admin auth**: Single Bearer token (`ADMIN_TOKEN` env var)
-- **Rate limiting**: In-memory via `governor` crate (60/min reads, 3/hr submissions)
-- **CORS**: Configurable via `FRONTEND_URL` env var
+- **Admin auth**: Single Bearer token (`ADMIN_TOKEN` env var), no rate limit on admin endpoints
+- **Rate limiting**: In-memory via `governor` crate (60/min reads, 30/hr submissions)
+- **CORS**: Open to all origins (`*`) by design
+- **Agent discovery**: `/.well-known/agent.json`, `/.well-known/ai-plugin.json`, `/api/openapi.json`
 
 ## Prerequisites
 
@@ -24,9 +27,8 @@ Both AI agents (via REST API) and humans (via React UI) are first-class consumer
 ### 1. Clone & Configure
 
 ```bash
-# Copy the env template at the project root and configure
 cp .env.example .env
-# Edit .env — at minimum set DATABASE_URL and ADMIN_TOKEN
+# Edit .env- at minimum set DATABASE_URL and ADMIN_TOKEN
 ```
 
 The `.env` file lives in the **project root** (not inside `backend/` or `frontend/`). Both services read from it.
@@ -35,7 +37,7 @@ The `.env` file lives in the **project root** (not inside `backend/` or `fronten
 
 ```bash
 createdb agent_directory
-# Migrations and seed data run automatically when the backend starts — no manual step needed.
+# Migrations and seed data run automatically when the backend starts- no manual step needed.
 ```
 
 ### 3. Backend
@@ -43,7 +45,7 @@ createdb agent_directory
 ```bash
 cd backend
 cargo run
-# Server starts on http://localhost:8000
+# Server starts on http://localhost:8000 (or ROCKET_PORT from .env)
 # Migrations run automatically on startup via sqlx::migrate!()
 ```
 
@@ -52,10 +54,10 @@ cargo run
 ```bash
 cd frontend
 npm install
-npm run dev    # Vite dev server on http://localhost:5173
+npm run dev    # Vite dev server on http://localhost:5173 (or as configured in vite.config.ts)
 ```
 
-The Vite dev server proxies `/api` requests to `localhost:8000` automatically (configured in `vite.config.ts`).
+The Vite dev server proxies `/api` requests to the backend automatically (configured in `vite.config.ts`).
 
 ### 5. Production Build
 
@@ -64,7 +66,15 @@ cd frontend
 npm run build   # Outputs to dist/
 ```
 
-Serve the `dist/` folder with any static file server (Nginx, Caddy, etc.) and route `/api` requests to the Rocket backend. For local dev, leave `VITE_API_BASE_URL` unset (the Vite proxy handles it). For production, set `VITE_API_BASE_URL` **at build time** only if frontend and backend are on different origins.
+Serve the `dist/` folder with any static file server (Nginx, Caddy, etc.) and route `/api` requests to the Rocket backend. For production, set `VITE_API_BASE_URL` **at build time** only if frontend and backend are on different origins.
+
+### 6. Docker Compose
+
+```bash
+docker compose up
+```
+
+Starts PostgreSQL and the backend. Frontend runs separately.
 
 ## Environment Variables
 
@@ -72,8 +82,8 @@ All variables are set in the root `.env` file.
 
 | Variable | Required | Description | Default |
 |----------|----------|-------------|---------|
-| `DATABASE_URL` | Yes | PostgreSQL connection string | — |
-| `ADMIN_TOKEN` | Yes | Admin password used as Bearer token | — |
+| `DATABASE_URL` | Yes | PostgreSQL connection string |- |
+| `ADMIN_TOKEN` | Yes | Admin password used as Bearer token |- |
 | `ROCKET_PORT` | No | Backend server port | `8000` |
 | `ROCKET_ADDRESS` | No | Backend bind address | `0.0.0.0` |
 | `FRONTEND_URL` | No | Allowed CORS origin | `http://localhost:5173` |
@@ -85,6 +95,7 @@ All variables are set in the root `.env` file.
 ```
 .env                     # All environment variables (root level)
 .env.example             # Template
+PROJECT_OVERVIEW.md      # Client-facing feature overview
 
 backend/
   src/
@@ -103,6 +114,9 @@ backend/
     errors.rs            # Unified JSON error responses ({ "error": "...", "code": "..." })
     slug.rs              # Slug generation + uniqueness
   migrations/            # SQL migrations (auto-run on startup)
+  openapi.json           # OpenAPI 3.0 spec (served at /api/openapi.json)
+  agent.json             # Agent capabilities manifest (served at /.well-known/agent.json)
+  ai-plugin.json         # AI plugin manifest (served at /.well-known/ai-plugin.json)
 
 frontend/
   src/
@@ -111,49 +125,76 @@ frontend/
     lib/
       api.ts             # Typed fetch wrapper for all endpoints
       constants.ts       # APP_NAME, API_BASE_URL
-      categoryColors.ts  # Category color mapping
     hooks/               # useListingsQuery (URL-synced filters + pagination)
     types/               # TypeScript interfaces
-  vite.config.ts         # Dev server proxy: /api → localhost:8000
+  vite.config.ts         # Dev server proxy: /api → backend
 ```
 
 ## API
 
 Full interactive documentation is available at `/api-docs` in the running application.
 
+### Agent Discovery (no auth)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/.well-known/agent.json` | Agent capabilities manifest- lists all operations, params, rate limits |
+| `GET` | `/.well-known/ai-plugin.json` | AI plugin manifest (ChatGPT plugin format) |
+| `GET` | `/api/openapi.json` | Full OpenAPI 3.0 specification |
+
 ### Public Endpoints (no auth)
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/api/listings` | Paginated listing search with filters (`search`, `category`, `tag`, `chain`, `sort`) |
+| `GET` | `/api/listings` | Paginated listing search with filters (`search`, `category`, `tag`, `chain`, `sort`, `page`, `per_page`) |
 | `GET` | `/api/listings/:slug` | Single listing detail (atomically increments view count) |
-| `POST` | `/api/listings` | Submit a new listing (enters pending queue, rate limited to 3/hr) |
+| `POST` | `/api/listings` | Submit a new listing (enters pending queue, rate limited to 30/hr) |
 | `GET` | `/api/categories` | All categories with listing counts |
 | `GET` | `/api/tags` | All tags with listing counts |
 | `GET` | `/api/chains` | All supported chains |
+| `GET` | `/api/health` | Health check |
+| `GET` | `/api/submissions/:id/status` | Check submission review status |
 
-### Authenticated Endpoints (Bearer token)
+### Admin Endpoints (Bearer token, no rate limit)
 
 | Method | Path | Description |
 |--------|------|-------------|
+| `GET` | `/api/admin/listings` | All listings with status/search filtering |
+| `GET` | `/api/admin/listings/:id` | Full listing detail including contact email |
+| `POST` | `/api/admin/listings` | Create listing directly (skip pending) |
+| `PATCH` | `/api/admin/listings/:id` | Update any field |
+| `DELETE` | `/api/admin/listings/:id` | Hard delete |
+| `POST` | `/api/admin/listings/:id/approve` | Approve pending submission |
+| `POST` | `/api/admin/listings/:id/reject` | Reject with optional note |
+| `POST` | `/api/admin/listings/:id/toggle-featured` | Toggle featured flag |
+| `GET` | `/api/admin/stats` | Dashboard stats |
+| `POST` | `/api/admin/categories` | Create new category |
+| `POST` | `/api/admin/chains` | Create new chain |
+| `GET` | `/api/admin/chain-suggestions` | List pending chain suggestions |
+| `POST` | `/api/admin/chain-suggestions/:id/approve` | Approve chain suggestion |
+| `POST` | `/api/admin/chain-suggestions/:id/reject` | Reject chain suggestion |
 | `PATCH` | `/api/listings/:id/reputation` | Update reputation score (stubbed for future scoring service) |
 
-All errors return JSON: `{ "error": "...", "code": "..." }`. POST/PATCH requests require `Content-Type: application/json`. See `/api-docs` for full response schemas, error codes, and rate limit details.
+All errors return JSON: `{ "error": "...", "code": "..." }`. POST/PATCH requests require `Content-Type: application/json`. See `/api-docs` for full response schemas and error codes.
 
 ### Agent Workflow Example
 
 ```bash
-# 1. Discover categories and chains
+# 1. Discover the API
+curl https://your-domain.com/.well-known/agent.json
+curl https://your-domain.com/api/openapi.json
+
+# 2. Discover categories and chains
 curl https://your-domain.com/api/categories
 curl https://your-domain.com/api/chains
 
-# 2. Search listings
+# 3. Search listings
 curl "https://your-domain.com/api/listings?search=wallet&chain=ckb&sort=views"
 
-# 3. Get listing detail
+# 4. Get listing detail
 curl https://your-domain.com/api/listings/some-tool-slug
 
-# 4. Submit a new listing
+# 5. Submit a new listing
 curl -X POST https://your-domain.com/api/listings \
   -H "Content-Type: application/json" \
   -d '{
@@ -169,16 +210,20 @@ curl -X POST https://your-domain.com/api/listings \
 # Returns: { "id": "uuid", "slug": "my-ai-tool", "status": "pending", "submitted_at": "..." }
 ```
 
+## Seed Data
+
+The directory ships with 14 pre-approved AI-first listings across 8 categories, 6 chains, and 20 tags. Listings include projects like Joule Finance, .bit, Fetch.ai, SingularityNET, XMTP, Lit Protocol, Solana Agent Kit, and others.
+
 ## Admin Panel
 
-Access at `/admin` (not linked from public UI - intentional). Log in with the `ADMIN_TOKEN` value from `.env`.
+Access at `/admin` (not linked from public UI- intentional). Log in with the `ADMIN_TOKEN` value from `.env`.
 
-- Dashboard with stats (total, pending, approved, rejected, total views)
+- Dashboard with stats (total, pending, approved, rejected, total views, top listings)
 - Approve/reject submissions with optional rejection notes
 - Full listing editing (name, description, URLs, categories, tags, chains)
-- Toggle CKB Featured badge
+- Toggle featured badge
 - Manage chain suggestions from submitters
-- Create new categories and chains
+- Create new categories and chains on the fly
 
 Approved listings appear on the public site immediately. Rejected or pending listings are never visible to public users or API consumers.
 
@@ -188,6 +233,4 @@ Made with love by [Furqan (@furqandotahmed)](https://x.com/furqandotahmed) in Pa
 
 ## Nervos / CKB
 
-AgentRadar is part of the **Humans Not Required** initiative by [Nervos Network](https://www.nervos.org/). The initiative explores AI-first infrastructure on CKB — where agents are first-class participants, not afterthoughts. CKB appears as a featured chain in the directory, but the platform is ecosystem-neutral and welcomes agents across all chains.
-
-
+AgentRadar is part of the **Humans Not Required** initiative by [Nervos Network](https://www.nervos.org/). CKB appears as a featured chain (amber badge, listed first), but the platform is ecosystem-neutral and welcomes agents across all chains.

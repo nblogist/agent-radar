@@ -307,7 +307,7 @@ export default function AdminEditListing() {
                     </div>
                     <div>
                       <label className="block text-xs text-slate-500 mb-1">Logo URL <span className="text-slate-600 font-normal">(leave empty for auto-generated)</span></label>
-                      <input className={inputClass} type="url" placeholder="https://example.com/logo.png" value={editLogoUrl} onChange={e => setEditLogoUrl(e.target.value)} />
+                      <input className={inputClass} type="text" placeholder="https://example.com/logo.png" value={editLogoUrl} onChange={e => setEditLogoUrl(e.target.value)} />
                     </div>
                   </>
                 ) : (
@@ -333,19 +333,19 @@ export default function AdminEditListing() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs text-slate-500 mb-1">Website URL</label>
-                  <input className={inputClass} type="url" value={editWebsiteUrl} onChange={e => setEditWebsiteUrl(e.target.value)} />
+                  <input className={inputClass} type="text" value={editWebsiteUrl} onChange={e => setEditWebsiteUrl(e.target.value)} />
                 </div>
                 <div>
                   <label className="block text-xs text-slate-500 mb-1">GitHub URL</label>
-                  <input className={inputClass} type="url" placeholder="https://github.com/..." value={editGithubUrl} onChange={e => setEditGithubUrl(e.target.value)} />
+                  <input className={inputClass} type="text" placeholder="https://github.com/..." value={editGithubUrl} onChange={e => setEditGithubUrl(e.target.value)} />
                 </div>
                 <div>
                   <label className="block text-xs text-slate-500 mb-1">Docs URL</label>
-                  <input className={inputClass} type="url" placeholder="https://docs.example.com" value={editDocsUrl} onChange={e => setEditDocsUrl(e.target.value)} />
+                  <input className={inputClass} type="text" placeholder="https://docs.example.com" value={editDocsUrl} onChange={e => setEditDocsUrl(e.target.value)} />
                 </div>
                 <div>
                   <label className="block text-xs text-slate-500 mb-1">API Endpoint</label>
-                  <input className={inputClass} type="url" placeholder="https://api.example.com" value={editApiEndpointUrl} onChange={e => setEditApiEndpointUrl(e.target.value)} />
+                  <input className={inputClass} type="text" placeholder="https://api.example.com" value={editApiEndpointUrl} onChange={e => setEditApiEndpointUrl(e.target.value)} />
                 </div>
               </div>
             ) : (
