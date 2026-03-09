@@ -75,9 +75,9 @@ export default function ListingDetailPage() {
   return (
     <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-20 py-8">
       <Helmet>
-        <title>{listing.name} | {APP_NAME}</title>
+        <title>{listing.name}</title>
         <meta name="description" content={listing.short_description} />
-        <meta property="og:title" content={`${listing.name} | ${APP_NAME}`} />
+        <meta property="og:title" content={`${listing.name} | AgentRadar`} />
         <meta property="og:description" content={listing.short_description} />
         <meta property="og:type" content="website" />
         {listing.logo_url && <meta property="og:image" content={listing.logo_url} />}

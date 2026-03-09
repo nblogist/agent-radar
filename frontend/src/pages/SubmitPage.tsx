@@ -242,9 +242,9 @@ export default function SubmitPage() {
   return (
     <main className="flex-1 max-w-[1440px] mx-auto w-full px-4 sm:px-6 lg:px-20 py-12">
       <Helmet>
-        <title>Submit a Listing | {APP_NAME}</title>
+        <title>Submit a Listing</title>
         <meta name="description" content="Submit your AI agent, tool, or infrastructure to the AgentRadar directory." />
-        <meta property="og:title" content={`Submit a Listing | ${APP_NAME}`} />
+        <meta property="og:title" content="Submit a Listing | AgentRadar" />
         <meta property="og:description" content="Submit your AI agent, tool, or infrastructure to the AgentRadar directory." />
         <meta property="og:type" content="website" />
       </Helmet>

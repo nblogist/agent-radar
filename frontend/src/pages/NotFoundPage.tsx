@@ -1,12 +1,11 @@
 import { Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
-import { APP_NAME } from '../lib/constants';
 
 export default function NotFoundPage() {
   return (
     <div className="flex flex-col items-center justify-center py-32 px-6 text-center">
       <Helmet>
-        <title>Page Not Found | {APP_NAME}</title>
+        <title>Page Not Found</title>
       </Helmet>
       <h1 className="text-6xl font-bold text-primary mb-4">404</h1>
       <p className="text-slate-400 text-lg mb-8">Page not found</p>

@@ -4,7 +4,7 @@ import { Helmet } from 'react-helmet-async';
 import { useListingsQuery } from '../hooks/useListingsQuery';
 import { fetchCategories, fetchChains } from '../lib/api';
 import { getCategoryColor } from '../lib/categoryColors';
-import { APP_NAME } from '../lib/constants';
+
 import ListingLogo from '../components/ListingLogo';
 import EmptyState from '../components/EmptyState';
 
@@ -23,9 +23,9 @@ export default function BrowsePage() {
   return (
     <div className="flex flex-1 overflow-hidden" style={{ height: 'calc(100vh - 73px)' }}>
       <Helmet>
-        <title>Browse Directory | {APP_NAME}</title>
+        <title>Browse Directory</title>
         <meta name="description" content="Explore AI agents, tools, and services across the decentralized web." />
-        <meta property="og:title" content={`Browse Directory | ${APP_NAME}`} />
+        <meta property="og:title" content="Browse Directory | AgentRadar" />
         <meta property="og:description" content="Explore AI agents, tools, and services across the decentralized web." />
         <meta property="og:type" content="website" />
       </Helmet>

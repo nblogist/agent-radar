@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { useQuery } from '@tanstack/react-query';
 import { searchSubmissionStatus } from '../lib/api';
-import { APP_NAME } from '../lib/constants';
+
 import type { SubmissionStatusResponse } from '../types/api';
 
 const statusStyles: Record<string, { bg: string; text: string; label: string }> = {
@@ -99,9 +99,9 @@ export default function CheckStatusPage() {
   return (
     <main className="flex-1 max-w-3xl mx-auto w-full px-4 sm:px-6 lg:px-20 py-12">
       <Helmet>
-        <title>Check Submission Status | {APP_NAME}</title>
+        <title>Check Submission Status</title>
         <meta name="description" content="Check the status of your submitted listing on AgentRadar." />
-        <meta property="og:title" content={`Check Submission Status | ${APP_NAME}`} />
+        <meta property="og:title" content="Check Submission Status | AgentRadar" />
         <meta property="og:description" content="Check the status of your submitted listing on AgentRadar." />
         <meta property="og:type" content="website" />
       </Helmet>

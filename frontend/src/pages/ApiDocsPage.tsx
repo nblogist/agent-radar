@@ -69,9 +69,9 @@ export default function ApiDocsPage() {
   return (
     <main className="flex-1 max-w-5xl mx-auto w-full px-4 sm:px-6 lg:px-20 py-12">
       <Helmet>
-        <title>API Documentation | {APP_NAME}</title>
+        <title>API Documentation</title>
         <meta name="description" content="REST API documentation for AgentRadar — discover, filter, submit, and check listings programmatically." />
-        <meta property="og:title" content={`API Documentation | ${APP_NAME}`} />
+        <meta property="og:title" content="API Documentation | AgentRadar" />
         <meta property="og:description" content="REST API documentation for AgentRadar — discover, filter, submit, and check listings programmatically." />
         <meta property="og:type" content="website" />
       </Helmet>

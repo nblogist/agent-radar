@@ -33,7 +33,7 @@ export default function HomePage() {
   return (
     <>
       <Helmet>
-        <title>{APP_NAME} | AI Agent Directory</title>
+        <title>AI Agent Directory</title>
         <meta name="description" content="Discover and explore the best AI-first tools and infrastructure across the decentralized web. An open directory for the agentic economy." />
         <meta property="og:title" content={`${APP_NAME} | AI Agent Directory`} />
         <meta property="og:description" content="Discover and explore the best AI-first tools and infrastructure across the decentralized web." />
