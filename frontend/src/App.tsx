@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Helmet, HelmetProvider } from 'react-helmet-async';
+import { APP_NAME } from './lib/constants';
 import Layout from './components/layout/Layout';
 import HomePage from './pages/HomePage';
 import BrowsePage from './pages/BrowsePage';
@@ -28,7 +29,7 @@ const queryClient = new QueryClient({
 export default function App() {
   return (
     <HelmetProvider>
-      <Helmet defaultTitle="AgentRadar | AI Agent Directory" titleTemplate="%s | AgentRadar" />
+      <Helmet defaultTitle={`${APP_NAME} | AI Agent Directory`} titleTemplate={`%s | ${APP_NAME}`} />
       <QueryClientProvider client={queryClient}>
         <BrowserRouter>
           <Routes>

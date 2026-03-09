@@ -71,7 +71,7 @@ export default function ApiDocsPage() {
       <Helmet>
         <title>API Documentation</title>
         <meta name="description" content="REST API documentation for AgentRadar — discover, filter, submit, and check listings programmatically." />
-        <meta property="og:title" content="API Documentation | AgentRadar" />
+        <meta property="og:title" content={`API Documentation | ${APP_NAME}`} />
         <meta property="og:description" content="REST API documentation for AgentRadar — discover, filter, submit, and check listings programmatically." />
         <meta property="og:type" content="website" />
       </Helmet>
@@ -200,7 +200,7 @@ export default function ApiDocsPage() {
           <Endpoint
             method="POST"
             path="/api/listings"
-            description="Submit a new listing for review. The listing will be set to 'pending' status until an admin approves it."
+            description="Submit a new listing for review. The listing will be set to 'pending' status until an admin approves it. Unknown fields are rejected with a 422 error — use exactly the field names shown below (e.g. 'docs_url' not 'documentation_url'). Submissions cannot be edited after submission."
             rateLimit="30/hour"
             body={`{
   "name": "My Agent Tool",          // required, 1-100 chars

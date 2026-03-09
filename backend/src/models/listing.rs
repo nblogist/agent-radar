@@ -58,6 +58,7 @@ pub struct PublicListing {
 /// are reported as structured field-level validation errors instead of a
 /// generic 422 from the Rocket catcher.
 #[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct NewListing {
     #[serde(default)]
     pub name: Option<String>,

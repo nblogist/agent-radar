@@ -156,7 +156,7 @@
       "post": {
         "tags": ["Submissions"],
         "summary": "Submit a new listing",
-        "description": "Submit a new agent tool/service for review. Listings are set to 'pending' status and must be approved by an admin before appearing in search results. Rate limited to 30 submissions per hour per IP.",
+        "description": "Submit a new agent tool/service for review. Listings are set to 'pending' status and must be approved by an admin before appearing in search results. Rate limited to 30 submissions per hour per IP. IMPORTANT: Unknown fields are rejected with a 422 error — use exactly the field names specified in the schema (e.g. 'docs_url' not 'documentation_url'). Submissions cannot be edited after submission, so verify your payload before sending.",
         "operationId": "submitListing",
         "requestBody": {
           "required": true,

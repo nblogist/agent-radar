@@ -50,6 +50,8 @@ export default function SubmitPage() {
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [formError, setFormError] = useState('');
   const [showPreview, setShowPreview] = useState(false);
+  const [showConfirmation, setShowConfirmation] = useState(false);
+  const [pendingPayload, setPendingPayload] = useState<NewListingPayload | null>(null);
 
   const mutation = useMutation({
     mutationFn: submitListing,
@@ -194,7 +196,16 @@ export default function SubmitPage() {
     if (apiEndpointUrl) payload.api_endpoint_url = apiEndpointUrl;
     if (suggestedChains.length > 0) payload.suggested_chains = suggestedChains;
 
-    mutation.mutate(payload);
+    setPendingPayload(payload);
+    setShowConfirmation(true);
+  }
+
+  function confirmSubmit() {
+    if (pendingPayload) {
+      mutation.mutate(pendingPayload);
+      setShowConfirmation(false);
+      setPendingPayload(null);
+    }
   }
 
   // Clear field error on change
@@ -244,7 +255,7 @@ export default function SubmitPage() {
       <Helmet>
         <title>Submit a Listing</title>
         <meta name="description" content="Submit your AI agent, tool, or infrastructure to the AgentRadar directory." />
-        <meta property="og:title" content="Submit a Listing | AgentRadar" />
+        <meta property="og:title" content={`Submit a Listing | ${APP_NAME}`} />
         <meta property="og:description" content="Submit your AI agent, tool, or infrastructure to the AgentRadar directory." />
         <meta property="og:type" content="website" />
       </Helmet>
@@ -671,6 +682,74 @@ export default function SubmitPage() {
           </div>
         </div>
       </div>
+
+      {/* Confirmation Modal */}
+      {showConfirmation && pendingPayload && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-dark-surface border border-primary/20 rounded-2xl shadow-2xl max-w-lg w-full p-8 max-h-[80vh] overflow-y-auto">
+            <div className="flex items-center gap-3 mb-6">
+              <span className="material-symbols-outlined text-3xl text-amber-500" style={filledStyle}>warning</span>
+              <h3 className="text-xl font-bold">Review Before Submitting</h3>
+            </div>
+            <p className="text-slate-400 text-sm mb-6">
+              Submissions cannot be edited after submission. Please review your details carefully.
+            </p>
+            <div className="space-y-3 text-sm">
+              <div className="flex gap-2">
+                <span className="text-slate-500 w-24 shrink-0">Name</span>
+                <span className="font-medium">{pendingPayload.name}</span>
+              </div>
+              <div className="flex gap-2">
+                <span className="text-slate-500 w-24 shrink-0">Website</span>
+                <span className="text-primary break-all">{pendingPayload.website_url}</span>
+              </div>
+              <div className="flex gap-2">
+                <span className="text-slate-500 w-24 shrink-0">Summary</span>
+                <span className="text-slate-300">{pendingPayload.short_description}</span>
+              </div>
+              <div className="flex gap-2">
+                <span className="text-slate-500 w-24 shrink-0">Categories</span>
+                <span className="text-slate-300">
+                  {pendingPayload.categories.map(id => categories?.find(c => c.id === id)?.name || id).join(', ')}
+                </span>
+              </div>
+              {pendingPayload.tags.length > 0 && (
+                <div className="flex gap-2">
+                  <span className="text-slate-500 w-24 shrink-0">Tags</span>
+                  <span className="text-slate-300">{pendingPayload.tags.join(', ')}</span>
+                </div>
+              )}
+              {pendingPayload.docs_url && (
+                <div className="flex gap-2">
+                  <span className="text-slate-500 w-24 shrink-0">Docs URL</span>
+                  <span className="text-primary break-all">{pendingPayload.docs_url}</span>
+                </div>
+              )}
+              {pendingPayload.github_url && (
+                <div className="flex gap-2">
+                  <span className="text-slate-500 w-24 shrink-0">GitHub</span>
+                  <span className="text-primary break-all">{pendingPayload.github_url}</span>
+                </div>
+              )}
+            </div>
+            <div className="flex gap-3 mt-8">
+              <button
+                onClick={() => { setShowConfirmation(false); setPendingPayload(null); }}
+                className="flex-1 px-4 py-3 rounded-lg border border-white/10 text-slate-300 hover:bg-white/5 transition-colors font-medium"
+              >
+                Go Back & Edit
+              </button>
+              <button
+                onClick={confirmSubmit}
+                disabled={mutation.isPending}
+                className="flex-1 px-4 py-3 rounded-lg bg-primary hover:bg-primary/90 text-white font-bold transition-all shadow-lg disabled:opacity-50"
+              >
+                {mutation.isPending ? 'Submitting...' : 'Confirm & Submit'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

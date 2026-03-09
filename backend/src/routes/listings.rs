@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use rocket::http::Status;
 use rocket::response::status::Custom;
 use rocket::serde::json::Json;
 use rocket::State;
@@ -626,9 +627,24 @@ pub struct ReputationResponse {
 #[post("/listings", data = "<body>")]
 pub async fn submit_listing(
     pool: &State<DbPool>,
-    body: Json<NewListing>,
+    body: Result<Json<NewListing>, rocket::serde::json::Error<'_>>,
     _rl: SubmitRateLimit,
 ) -> Result<rocket::response::status::Created<Json<SubmitResponse>>, Custom<Json<ErrorBody>>> {
+    let body = body.map_err(|e| {
+        let msg = match &e {
+            rocket::serde::json::Error::Parse(_input, serde_err) => {
+                format!("Invalid request body: {}", serde_err)
+            }
+            rocket::serde::json::Error::Io(io_err) => {
+                format!("Could not read request body: {}", io_err)
+            }
+        };
+        Custom(Status::UnprocessableEntity, Json(ErrorBody {
+            error: msg,
+            code: "VALIDATION_ERROR".to_string(),
+            fields: None,
+        }))
+    })?;
     let payload = body.into_inner();
 
     // --- Collect ALL validation errors at once ---
