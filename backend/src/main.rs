@@ -216,6 +216,7 @@ async fn rocket() -> _ {
             routes::listings::submit_listing,
             routes::listings::patch_reputation,
             routes::listings::health_check,
+            routes::listings::search_submissions,
             routes::listings::get_submission_status,
             routes::categories::list_categories,
             routes::tags::list_tags,

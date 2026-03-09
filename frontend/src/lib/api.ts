@@ -11,6 +11,7 @@ import type {
   ListingsQuery,
   NewListingPayload,
   SubmitResponse,
+  SubmissionStatusResponse,
   AdminListing,
   AdminListingDetail,
   AdminStats,
@@ -80,6 +81,20 @@ export async function submitListing(payload: NewListingPayload): Promise<SubmitR
     throw new ApiError(res.status, body.error ?? res.statusText);
   }
   return res.json() as Promise<SubmitResponse>;
+}
+
+// --- Submission Status ---
+
+export async function searchSubmissionStatus(query: string): Promise<SubmissionStatusResponse[]> {
+  return fetchJson<SubmissionStatusResponse[]>(
+    `/api/submissions/search?q=${encodeURIComponent(query)}`,
+  );
+}
+
+export async function fetchSubmissionStatus(idOrSlug: string): Promise<SubmissionStatusResponse> {
+  return fetchJson<SubmissionStatusResponse>(
+    `/api/submissions/${encodeURIComponent(idOrSlug)}/status`,
+  );
 }
 
 // --- Admin API ---

@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
+import { Helmet } from 'react-helmet-async';
 import { fetchListings, fetchCategories } from '../lib/api';
 import { getCategoryColor } from '../lib/categoryColors';
+import { APP_NAME } from '../lib/constants';
 import ListingLogo from '../components/ListingLogo';
 
 export default function HomePage() {
@@ -30,6 +32,13 @@ export default function HomePage() {
 
   return (
     <>
+      <Helmet>
+        <title>{APP_NAME} | AI Agent Directory</title>
+        <meta name="description" content="Discover and explore the best AI-first tools and infrastructure across the decentralized web. An open directory for the agentic economy." />
+        <meta property="og:title" content={`${APP_NAME} | AI Agent Directory`} />
+        <meta property="og:description" content="Discover and explore the best AI-first tools and infrastructure across the decentralized web." />
+        <meta property="og:type" content="website" />
+      </Helmet>
       {/* ── Hero Section ────────────────────────────────────── */}
       <section className="relative px-4 sm:px-6 py-16 lg:py-24 overflow-hidden">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(55,19,236,0.1),transparent)] pointer-events-none" />

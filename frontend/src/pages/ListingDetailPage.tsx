@@ -1,7 +1,9 @@
 import { Link, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
+import { Helmet } from 'react-helmet-async';
 import { fetchListing, ApiError } from '../lib/api';
 import { getCategoryColor } from '../lib/categoryColors';
+import { APP_NAME } from '../lib/constants';
 import ListingLogo from '../components/ListingLogo';
 import MarkdownRenderer from '../components/MarkdownRenderer';
 
@@ -72,6 +74,14 @@ export default function ListingDetailPage() {
 
   return (
     <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-20 py-8">
+      <Helmet>
+        <title>{listing.name} | {APP_NAME}</title>
+        <meta name="description" content={listing.short_description} />
+        <meta property="og:title" content={`${listing.name} | ${APP_NAME}`} />
+        <meta property="og:description" content={listing.short_description} />
+        <meta property="og:type" content="website" />
+        {listing.logo_url && <meta property="og:image" content={listing.logo_url} />}
+      </Helmet>
       {/* Breadcrumbs */}
       <nav className="flex items-center gap-2 mb-8 text-sm font-medium">
         <Link className="text-slate-500 hover:text-primary transition-colors" to="/">Home</Link>

@@ -1,10 +1,12 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { HelmetProvider } from 'react-helmet-async';
 import Layout from './components/layout/Layout';
 import HomePage from './pages/HomePage';
 import BrowsePage from './pages/BrowsePage';
 import ListingDetailPage from './pages/ListingDetailPage';
 import SubmitPage from './pages/SubmitPage';
+import CheckStatusPage from './pages/CheckStatusPage';
 import NotFoundPage from './pages/NotFoundPage';
 import ApiDocsPage from './pages/ApiDocsPage';
 // Admin imports
@@ -25,32 +27,35 @@ const queryClient = new QueryClient({
 
 export default function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
-        <Routes>
-          {/* Admin login (unauthenticated, no layout) */}
-          <Route path="/admin" element={<AdminLogin />} />
+    <HelmetProvider>
+      <QueryClientProvider client={queryClient}>
+        <BrowserRouter>
+          <Routes>
+            {/* Admin login (unauthenticated, no layout) */}
+            <Route path="/admin" element={<AdminLogin />} />
 
-          {/* Protected admin routes: AdminGuard checks token, AdminLayout provides sidebar */}
-          <Route element={<AdminGuard />}>
-            <Route element={<AdminLayout />}>
-              <Route path="/admin/dashboard" element={<AdminDashboard />} />
-              <Route path="/admin/listings" element={<Navigate to="/admin/dashboard" replace />} />
-              <Route path="/admin/listings/:id" element={<AdminEditListing />} />
+            {/* Protected admin routes: AdminGuard checks token, AdminLayout provides sidebar */}
+            <Route element={<AdminGuard />}>
+              <Route element={<AdminLayout />}>
+                <Route path="/admin/dashboard" element={<AdminDashboard />} />
+                <Route path="/admin/listings" element={<Navigate to="/admin/dashboard" replace />} />
+                <Route path="/admin/listings/:id" element={<AdminEditListing />} />
+              </Route>
             </Route>
-          </Route>
 
-          {/* Public routes */}
-          <Route element={<Layout />}>
-            <Route path="/" element={<HomePage />} />
-            <Route path="/browse" element={<BrowsePage />} />
-            <Route path="/listings/:slug" element={<ListingDetailPage />} />
-            <Route path="/submit" element={<SubmitPage />} />
-            <Route path="/api-docs" element={<ApiDocsPage />} />
-            <Route path="*" element={<NotFoundPage />} />
-          </Route>
-        </Routes>
-      </BrowserRouter>
-    </QueryClientProvider>
+            {/* Public routes */}
+            <Route element={<Layout />}>
+              <Route path="/" element={<HomePage />} />
+              <Route path="/browse" element={<BrowsePage />} />
+              <Route path="/listings/:slug" element={<ListingDetailPage />} />
+              <Route path="/submit" element={<SubmitPage />} />
+              <Route path="/check-status" element={<CheckStatusPage />} />
+              <Route path="/api-docs" element={<ApiDocsPage />} />
+              <Route path="*" element={<NotFoundPage />} />
+            </Route>
+          </Routes>
+        </BrowserRouter>
+      </QueryClientProvider>
+    </HelmetProvider>
   );
 }

@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery, useMutation } from '@tanstack/react-query';
+import { Helmet } from 'react-helmet-async';
 import { fetchCategories, fetchChains, submitListing } from '../lib/api';
+import { APP_NAME } from '../lib/constants';
 import type { NewListingPayload } from '../types/api';
 import MarkdownRenderer from '../components/MarkdownRenderer';
 
@@ -215,11 +217,14 @@ export default function SubmitPage() {
             <div className="bg-slate-800/60 border border-slate-700 rounded-lg px-4 py-3 mb-8 text-left">
               <p className="text-xs text-slate-400 mb-1">Your listing reference:</p>
               <p className="text-sm font-mono text-primary font-bold">{mutation.data.slug}</p>
-              <p className="text-xs text-slate-500 mt-1">Keep this safe — you can use it to check on your listing status.</p>
+              <p className="text-xs text-slate-500 mt-1">Keep this safe — you can use it to <Link to="/check-status" className="text-primary hover:underline">check your submission status</Link>.</p>
             </div>
           )}
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link to="/browse" className="bg-primary text-white px-8 py-3 rounded-lg font-bold hover:bg-primary/90 transition-colors">
+            <Link to="/check-status" className="bg-primary text-white px-8 py-3 rounded-lg font-bold hover:bg-primary/90 transition-colors">
+              Check Submission Status
+            </Link>
+            <Link to="/browse" className="bg-slate-800 text-white px-8 py-3 rounded-lg font-bold hover:bg-slate-700 transition-colors">
               Browse Directory
             </Link>
             <button
@@ -236,6 +241,13 @@ export default function SubmitPage() {
 
   return (
     <main className="flex-1 max-w-[1440px] mx-auto w-full px-4 sm:px-6 lg:px-20 py-12">
+      <Helmet>
+        <title>Submit a Listing | {APP_NAME}</title>
+        <meta name="description" content="Submit your AI agent, tool, or infrastructure to the AgentRadar directory." />
+        <meta property="og:title" content={`Submit a Listing | ${APP_NAME}`} />
+        <meta property="og:description" content="Submit your AI agent, tool, or infrastructure to the AgentRadar directory." />
+        <meta property="og:type" content="website" />
+      </Helmet>
       <div className="flex flex-col lg:flex-row gap-12">
         {/* Form Column */}
         <div className="flex-1">

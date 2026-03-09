@@ -22,8 +22,13 @@
       "rate_limit": "30 requests per hour per IP"
     },
     "submission_status": {
-      "description": "Check the review status of a submitted listing",
+      "description": "Check the review status of a submitted listing by UUID or slug",
       "endpoint": "/api/submissions/{id}/status",
+      "method": "GET"
+    },
+    "submission_search": {
+      "description": "Search submissions by partial name or slug (ILIKE match, min 2 chars, max 10 results)",
+      "endpoint": "/api/submissions/search?q={query}",
       "method": "GET"
     },
     "metadata": {

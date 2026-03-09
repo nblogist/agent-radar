@@ -28,6 +28,7 @@ export default function Header() {
             <NavLink to="/browse" className={({ isActive }) => `text-sm font-medium hover:text-primary transition-colors ${isActive ? 'text-primary' : ''}`}>Directory</NavLink>
             <NavLink to="/submit" className={({ isActive }) => `text-sm font-medium hover:text-primary transition-colors ${isActive ? 'text-primary' : ''}`}>Submit</NavLink>
             <NavLink to="/api-docs" className={({ isActive }) => `text-sm font-medium hover:text-primary transition-colors ${isActive ? 'text-primary' : ''}`}>API Docs</NavLink>
+            <NavLink to="/check-status" className={({ isActive }) => `text-sm font-medium hover:text-primary transition-colors ${isActive ? 'text-primary' : ''}`}>Check Status</NavLink>
           </nav>
         </div>
         <div className="flex items-center gap-3">
@@ -61,6 +62,7 @@ export default function Header() {
           <NavLink to="/browse" onClick={() => setMobileMenuOpen(false)} className={({ isActive }) => `block text-sm font-medium px-2 py-1.5 rounded-lg transition-colors ${isActive ? 'text-primary bg-primary/5' : 'text-slate-400 hover:text-white'}`}>Directory</NavLink>
           <NavLink to="/submit" onClick={() => setMobileMenuOpen(false)} className={({ isActive }) => `block text-sm font-medium px-2 py-1.5 rounded-lg transition-colors ${isActive ? 'text-primary bg-primary/5' : 'text-slate-400 hover:text-white'}`}>Submit</NavLink>
           <NavLink to="/api-docs" onClick={() => setMobileMenuOpen(false)} className={({ isActive }) => `block text-sm font-medium px-2 py-1.5 rounded-lg transition-colors ${isActive ? 'text-primary bg-primary/5' : 'text-slate-400 hover:text-white'}`}>API Docs</NavLink>
+          <NavLink to="/check-status" onClick={() => setMobileMenuOpen(false)} className={({ isActive }) => `block text-sm font-medium px-2 py-1.5 rounded-lg transition-colors ${isActive ? 'text-primary bg-primary/5' : 'text-slate-400 hover:text-white'}`}>Check Status</NavLink>
         </nav>
       )}
     </header>

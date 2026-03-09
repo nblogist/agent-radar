@@ -507,6 +507,7 @@ pub async fn health_check(
 pub struct SubmissionStatusResponse {
     pub id: uuid::Uuid,
     pub slug: String,
+    pub name: String,
     pub status: String,
     pub submitted_at: chrono::DateTime<chrono::Utc>,
     pub approved_at: Option<chrono::DateTime<chrono::Utc>>,
@@ -518,23 +519,31 @@ pub async fn get_submission_status(
     pool: &State<DbPool>,
     id: &str,
 ) -> Result<Json<SubmissionStatusResponse>, Custom<Json<ErrorBody>>> {
-    let listing_id = uuid::Uuid::parse_str(id)
-        .map_err(|_| AppError::Validation("invalid listing id format".to_string()).into_response())?;
-
-    let row = sqlx::query_as::<_, (uuid::Uuid, String, String, chrono::DateTime<chrono::Utc>, Option<chrono::DateTime<chrono::Utc>>, Option<String>)>(
-        "SELECT id, slug, status, submitted_at, approved_at, rejection_note FROM listings WHERE id = $1"
-    )
-    .bind(listing_id)
-    .fetch_optional(pool.inner())
-    .await
+    // Accept UUID or slug
+    let row = if let Ok(listing_id) = uuid::Uuid::parse_str(id) {
+        sqlx::query_as::<_, (uuid::Uuid, String, String, String, chrono::DateTime<chrono::Utc>, Option<chrono::DateTime<chrono::Utc>>, Option<String>)>(
+            "SELECT id, slug, name, status, submitted_at, approved_at, rejection_note FROM listings WHERE id = $1"
+        )
+        .bind(listing_id)
+        .fetch_optional(pool.inner())
+        .await
+    } else {
+        sqlx::query_as::<_, (uuid::Uuid, String, String, String, chrono::DateTime<chrono::Utc>, Option<chrono::DateTime<chrono::Utc>>, Option<String>)>(
+            "SELECT id, slug, name, status, submitted_at, approved_at, rejection_note FROM listings WHERE slug = $1"
+        )
+        .bind(id)
+        .fetch_optional(pool.inner())
+        .await
+    }
     .map_err(|e| AppError::Db(e).into_response())?;
 
     match row {
         None => Err(AppError::NotFound.into_response()),
-        Some((id, slug, status, submitted_at, approved_at, rejection_note)) => {
+        Some((id, slug, name, status, submitted_at, approved_at, rejection_note)) => {
             Ok(Json(SubmissionStatusResponse {
                 id,
                 slug,
+                name,
                 status,
                 submitted_at,
                 approved_at,
@@ -542,6 +551,47 @@ pub async fn get_submission_status(
             }))
         }
     }
+}
+
+// ---------------------------------------------------------------------------
+// GET /api/submissions/search?q=<query> -- search submissions by partial slug/name
+// ---------------------------------------------------------------------------
+
+#[get("/submissions/search?<q>")]
+pub async fn search_submissions(
+    pool: &State<DbPool>,
+    _rl: ReadRateLimit,
+    q: &str,
+) -> Result<Json<Vec<SubmissionStatusResponse>>, Custom<Json<ErrorBody>>> {
+    let trimmed = q.replace('\0', "").trim().to_string();
+    if trimmed.len() < 2 {
+        return Ok(Json(vec![]));
+    }
+
+    // Escape ILIKE wildcards
+    let escaped = trimmed.replace('\\', "\\\\").replace('%', "\\%").replace('_', "\\_");
+    let like_val = format!("%{}%", escaped);
+
+    let rows = sqlx::query_as::<_, (uuid::Uuid, String, String, String, chrono::DateTime<chrono::Utc>, Option<chrono::DateTime<chrono::Utc>>, Option<String>)>(
+        "SELECT id, slug, name, status, submitted_at, approved_at, rejection_note \
+         FROM listings \
+         WHERE slug ILIKE $1 OR name ILIKE $1 \
+         ORDER BY submitted_at DESC \
+         LIMIT 10"
+    )
+    .bind(&like_val)
+    .fetch_all(pool.inner())
+    .await
+    .map_err(|e| AppError::Db(e).into_response())?;
+
+    let results: Vec<SubmissionStatusResponse> = rows
+        .into_iter()
+        .map(|(id, slug, name, status, submitted_at, approved_at, rejection_note)| {
+            SubmissionStatusResponse { id, slug, name, status, submitted_at, approved_at, rejection_note }
+        })
+        .collect();
+
+    Ok(Json(results))
 }
 
 // ---------------------------------------------------------------------------

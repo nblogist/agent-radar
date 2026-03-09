@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { Helmet } from 'react-helmet-async';
 import { APP_NAME, API_BASE_URL } from '../lib/constants';
 
 // Show the actual API base URL (backend domain in production, origin in dev with proxy)
@@ -67,6 +68,13 @@ function Endpoint({ method, path, description, params, body, response, rateLimit
 export default function ApiDocsPage() {
   return (
     <main className="flex-1 max-w-5xl mx-auto w-full px-4 sm:px-6 lg:px-20 py-12">
+      <Helmet>
+        <title>API Documentation | {APP_NAME}</title>
+        <meta name="description" content="REST API documentation for AgentRadar — discover, filter, submit, and check listings programmatically." />
+        <meta property="og:title" content={`API Documentation | ${APP_NAME}`} />
+        <meta property="og:description" content="REST API documentation for AgentRadar — discover, filter, submit, and check listings programmatically." />
+        <meta property="og:type" content="website" />
+      </Helmet>
       <nav className="flex items-center gap-2 mb-8 text-sm font-medium">
         <Link className="text-slate-500 hover:text-primary transition-colors" to="/">Home</Link>
         <span className="text-slate-400 material-symbols-outlined text-xs">chevron_right</span>
@@ -254,6 +262,52 @@ export default function ApiDocsPage() {
 ]`}
           />
 
+        </div>
+      </section>
+
+      {/* Submission Status Endpoints */}
+      <section className="mb-12">
+        <h2 className="text-2xl font-bold mb-6">Submission Status</h2>
+        <p className="text-slate-400 text-sm mb-6">
+          After submitting a listing, use these endpoints to check its review status. No authentication required.
+        </p>
+        <div className="space-y-6">
+          <Endpoint
+            method="GET"
+            path="/api/submissions/search?q=:query"
+            description="Search submissions by partial name or slug match (ILIKE). Returns up to 10 results, ordered by most recent. Minimum 2 characters required."
+            rateLimit="60/min"
+            params={[
+              { name: 'q', type: 'string', desc: 'Search query — matches against listing name or slug (min 2 chars)' },
+            ]}
+            response={`[
+  {
+    "id": "uuid",
+    "slug": "my-agent-tool",
+    "name": "My Agent Tool",
+    "status": "pending",        // "pending" | "approved" | "rejected"
+    "submitted_at": "2025-01-01T00:00:00Z",
+    "approved_at": null,         // set when approved
+    "rejection_note": null       // set when rejected
+  }
+]`}
+          />
+
+          <Endpoint
+            method="GET"
+            path="/api/submissions/:id/status"
+            description="Check the exact status of a single submission. Accepts either a UUID (returned at submission time) or the listing slug."
+            rateLimit="60/min"
+            response={`{
+  "id": "uuid",
+  "slug": "my-agent-tool",
+  "name": "My Agent Tool",
+  "status": "pending",
+  "submitted_at": "2025-01-01T00:00:00Z",
+  "approved_at": null,
+  "rejection_note": null
+}`}
+          />
         </div>
       </section>
 

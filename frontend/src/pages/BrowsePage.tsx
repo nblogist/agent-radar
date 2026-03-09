@@ -1,8 +1,10 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
+import { Helmet } from 'react-helmet-async';
 import { useListingsQuery } from '../hooks/useListingsQuery';
 import { fetchCategories, fetchChains } from '../lib/api';
 import { getCategoryColor } from '../lib/categoryColors';
+import { APP_NAME } from '../lib/constants';
 import ListingLogo from '../components/ListingLogo';
 import EmptyState from '../components/EmptyState';
 
@@ -20,6 +22,13 @@ export default function BrowsePage() {
 
   return (
     <div className="flex flex-1 overflow-hidden" style={{ height: 'calc(100vh - 73px)' }}>
+      <Helmet>
+        <title>Browse Directory | {APP_NAME}</title>
+        <meta name="description" content="Explore AI agents, tools, and services across the decentralized web." />
+        <meta property="og:title" content={`Browse Directory | ${APP_NAME}`} />
+        <meta property="og:description" content="Explore AI agents, tools, and services across the decentralized web." />
+        <meta property="og:type" content="website" />
+      </Helmet>
       {/* Sidebar */}
       <aside className="w-72 border-r border-dark-border flex-col bg-dark-bg overflow-y-auto custom-scrollbar hidden lg:flex">
         <div className="p-6 space-y-8">

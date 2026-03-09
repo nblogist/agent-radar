@@ -35,6 +35,8 @@ The main browsing experience lets users discover and explore listings through mu
 - **Browse page** with full filtering sidebar- search by name/description, filter by category, chain, or tag, sort by newest/most viewed/alphabetical
 - **Listing detail pages** with full markdown descriptions, external links (website, GitHub, docs, API endpoint), chain badges, category and tag labels, view counts, and timestamps
 - **Responsive design**- fully functional on mobile, tablet, and desktop
+- **Featured listings**- 5 curated listings (Fetch.ai, LangChain, Model Context Protocol, Bittensor, Lit Protocol) are highlighted with an amber "Featured" badge across Home and Browse pages
+- **SEO meta tags**- dynamic `<title>` and OpenGraph meta tags on every page via `react-helmet-async`, including per-listing OG tags with name, description, and logo
 - **Reputation score field** on every listing- currently displays "N/A" with a tooltip ("Reputation scoring coming soon"). The field is ready for the separate Reputation Scoring system to populate via API when it goes live
 
 ### Listing Submission
@@ -45,7 +47,9 @@ Anyone can submit a listing without creating an account:
 - Markdown editor with live preview for the full description
 - Submissions enter a **pending queue**- they are not visible to the public until an admin approves them
 - Rate limited to 30 submissions per hour per IP to prevent spam
-- On success, the submitter gets a confirmation with their submission ID
+- On success, the submitter gets a confirmation with their listing slug
+- **Check Submission Status** page (`/check-status`) — submitters can search for their listing by name or slug and see live status updates (pending/approved/rejected) with dates and rejection notes
+- Programmatic status check via `GET /api/submissions/search?q=<query>` (partial match) or `GET /api/submissions/<id-or-slug>/status` (exact lookup)
 
 ### Admin Panel
 
@@ -74,7 +78,8 @@ The entire directory is consumable via a clean JSON API. All read endpoints requ
 | GET | `/api/tags` | All tags with listing counts |
 | GET | `/api/chains` | All supported chains |
 | GET | `/api/health` | Health check |
-| GET | `/api/submissions/:id/status` | Check submission review status |
+| GET | `/api/submissions/search?q=` | Search submissions by partial name/slug (ILIKE, max 10 results) |
+| GET | `/api/submissions/:id/status` | Check submission status by UUID or slug |
 | POST | `/api/listings` | Submit a new listing (enters pending queue) |
 
 **Admin endpoints** (require `Authorization: Bearer <token>` header):

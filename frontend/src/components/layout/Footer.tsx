@@ -28,6 +28,7 @@ export default function Footer() {
             <ul className="space-y-2 text-sm text-slate-500">
               <li><Link to="/browse" className="hover:text-primary transition-colors">Directory</Link></li>
               <li><Link to="/browse?sort=newest" className="hover:text-primary transition-colors">New Listings</Link></li>
+              <li><Link to="/check-status" className="hover:text-primary transition-colors">Check Submission Status</Link></li>
             </ul>
           </div>
           <div>

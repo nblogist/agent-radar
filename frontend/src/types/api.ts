@@ -121,6 +121,16 @@ export interface SubmitResponse {
   submitted_at: string;
 }
 
+export interface SubmissionStatusResponse {
+  id: string;
+  slug: string;
+  name: string;
+  status: string;
+  submitted_at: string;
+  approved_at: string | null;
+  rejection_note: string | null;
+}
+
 // --- Admin Types ---
 
 export type ListingStatus = 'pending' | 'approved' | 'rejected';

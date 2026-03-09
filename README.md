@@ -10,6 +10,7 @@ See [PROJECT_OVERVIEW.md](PROJECT_OVERVIEW.md) for a detailed feature overview a
 
 - **Backend**: Rust + Rocket + PostgreSQL (SQLx migrations, auto-run on startup)
 - **Frontend**: React 18 + TypeScript + Tailwind CSS + Vite
+- **SEO**: Dynamic meta/OpenGraph tags via `react-helmet-async`
 - **Data fetching**: TanStack React Query
 - **Admin auth**: Single Bearer token (`ADMIN_TOKEN` env var), no rate limit on admin endpoints
 - **Rate limiting**: In-memory via `governor` crate (60/min reads, 30/hr submissions)
@@ -120,7 +121,7 @@ backend/
 
 frontend/
   src/
-    pages/               # Route pages (Home, Browse, ListingDetail, Submit, ApiDocs, admin/)
+    pages/               # Route pages (Home, Browse, ListingDetail, Submit, CheckStatus, ApiDocs, admin/)
     components/          # Shared UI (ListingCard, FilterBar, ListingLogo, ErrorBoundary, etc.)
     lib/
       api.ts             # Typed fetch wrapper for all endpoints
@@ -153,7 +154,8 @@ Full interactive documentation is available at `/api-docs` in the running applic
 | `GET` | `/api/tags` | All tags with listing counts |
 | `GET` | `/api/chains` | All supported chains |
 | `GET` | `/api/health` | Health check |
-| `GET` | `/api/submissions/:id/status` | Check submission review status |
+| `GET` | `/api/submissions/search?q=` | Search submissions by partial name/slug (ILIKE, max 10 results) |
+| `GET` | `/api/submissions/:id/status` | Check submission status by UUID or slug |
 
 ### Admin Endpoints (Bearer token, no rate limit)
 
@@ -208,11 +210,17 @@ curl -X POST https://your-domain.com/api/listings \
     "chains": ["<chain-uuid>"]
   }'
 # Returns: { "id": "uuid", "slug": "my-ai-tool", "status": "pending", "submitted_at": "..." }
+
+# 6. Check submission status (by slug or UUID)
+curl https://your-domain.com/api/submissions/my-ai-tool/status
+
+# 7. Search submissions by partial name/slug
+curl "https://your-domain.com/api/submissions/search?q=my-ai"
 ```
 
 ## Seed Data
 
-The directory ships with 14 pre-approved AI-first listings across 8 categories, 6 chains, and 20 tags. Listings include projects like Joule Finance, .bit, Fetch.ai, SingularityNET, XMTP, Lit Protocol, Solana Agent Kit, and others.
+The directory ships with pre-approved AI-first listings across 8 categories, 6 chains, and 20 tags. 5 listings are marked as featured (Fetch.ai, LangChain, Model Context Protocol, Bittensor, Lit Protocol). Listings include projects like Joule Finance, .bit, Fetch.ai, SingularityNET, XMTP, Lit Protocol, Solana Agent Kit, and others.
 
 ## Admin Panel
 

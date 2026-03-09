@@ -240,19 +240,60 @@
         }
       }
     },
+    "/submissions/search": {
+      "get": {
+        "tags": ["Submissions"],
+        "summary": "Search submissions by name or slug",
+        "description": "Search for submissions using partial name or slug match (ILIKE). Returns up to 10 results ordered by most recent. Minimum 2 characters required.",
+        "operationId": "searchSubmissions",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": true,
+            "description": "Search query — matches against listing name or slug (min 2 chars)",
+            "schema": { "type": "string", "minLength": 2 }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Array of matching submissions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": { "type": "string", "format": "uuid" },
+                      "slug": { "type": "string" },
+                      "name": { "type": "string" },
+                      "status": { "type": "string", "enum": ["pending", "approved", "rejected"] },
+                      "submitted_at": { "type": "string", "format": "date-time" },
+                      "approved_at": { "type": "string", "format": "date-time", "nullable": true },
+                      "rejection_note": { "type": "string", "nullable": true }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/submissions/{id}/status": {
       "get": {
         "tags": ["Submissions"],
         "summary": "Check submission status",
-        "description": "Check the review status of a previously submitted listing using the ID returned from POST /api/listings.",
+        "description": "Check the review status of a previously submitted listing. Accepts either a UUID (returned from POST /api/listings) or the listing slug.",
         "operationId": "getSubmissionStatus",
         "parameters": [
           {
             "name": "id",
             "in": "path",
             "required": true,
-            "description": "Listing UUID (returned in the submit response)",
-            "schema": { "type": "string", "format": "uuid" }
+            "description": "Listing UUID or slug",
+            "schema": { "type": "string" }
           }
         ],
         "responses": {
@@ -265,6 +306,7 @@
                   "properties": {
                     "id": { "type": "string", "format": "uuid" },
                     "slug": { "type": "string" },
+                    "name": { "type": "string" },
                     "status": { "type": "string", "enum": ["pending", "approved", "rejected"] },
                     "submitted_at": { "type": "string", "format": "date-time" },
                     "approved_at": { "type": "string", "format": "date-time", "nullable": true },
