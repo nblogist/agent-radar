@@ -76,6 +76,13 @@ impl Fairing for CorsFairing {
             "Access-Control-Max-Age",
             "86400",
         ));
+
+        // Agent discovery headers — helps agents find the API from any response
+        res.set_header(Header::new("X-API-Base", "/api"));
+        res.set_header(Header::new(
+            "Link",
+            "</.well-known/agent.json>; rel=\"agent-manifest\", </api/openapi.json>; rel=\"service-desc\"",
+        ));
     }
 }
 

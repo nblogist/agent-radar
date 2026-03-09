@@ -109,13 +109,24 @@ The entire directory is consumable via a clean JSON API. All read endpoints requ
 
 ### Agent-First Discovery
 
-Beyond the standard REST API, the platform publishes machine-readable discovery manifests so AI agents can find and understand the API automatically:
+The platform uses a 5-layer discovery approach so AI agents can find the API from any entry point — no prior knowledge required:
 
-- **`/.well-known/ai-plugin.json`**- AI plugin manifest (ChatGPT plugin format)
-- **`/.well-known/agent.json`**- Agent capabilities manifest listing all available operations, parameters, rate limits, and auth requirements
-- **`/api/openapi.json`**- Full OpenAPI 3.0 specification
+1. **HTTP headers** — Every response (frontend nginx and backend Rocket) includes `X-API-Base: /api` and RFC 8288 `Link` headers pointing to the agent manifest (`/.well-known/agent.json`) and OpenAPI spec (`/api/openapi.json`). An agent making *any* request gets discovery hints in the response headers.
 
-These are served directly by the backend- no separate documentation system needed.
+2. **Content negotiation** — When an agent sends `Accept: application/json` to the frontend root URL, nginx returns `agent.json` (the full discovery document) instead of the SPA HTML shell. Browsers always send `Accept: text/html,...` so they get the normal React app — zero impact on humans.
+
+3. **HTML meta tags** — `index.html` includes `<meta name="api-base" content="/api">` and `<link rel="agent-manifest" href="/.well-known/agent.json">` for agents that parse HTML before making API calls.
+
+4. **robots.txt** — Contains comments listing all discovery paths (`/api/openapi.json`, `/.well-known/agent.json`, `/.well-known/ai-plugin.json`, `/api/health`).
+
+5. **.well-known manifests** — Standard discovery files served directly as `application/json` by nginx (not falling through to SPA fallback, which would return HTML):
+   - **`/.well-known/agent.json`** — Agent capabilities manifest listing all operations, parameters, rate limits, and auth requirements
+   - **`/.well-known/ai-plugin.json`** — AI plugin manifest (ChatGPT plugin format)
+   - **`/api/openapi.json`** — Full OpenAPI 3.0 specification
+
+The backend root (`GET /`) also returns a JSON discovery document with all endpoint URLs, so agents hitting the backend directly (not through the frontend) can discover the API immediately.
+
+The frontend is served by nginx (not a basic static file server) specifically to enable content negotiation and discovery headers. The `PORT` is injected from the environment at container startup via `envsubst`, so it works with Railway and other PaaS platforms that control the port.
 
 ### API Documentation Page
 
@@ -125,7 +136,7 @@ A human-readable API docs page at `/api-docs` in the web interface, showing all 
 
 "Agent-first" is easy to slap on a product and hard to mean it. Here's what it means concretely in this build:
 
-**Agents can find the API without being told about it.** The platform publishes standard discovery manifests at `/.well-known/agent.json` and `/.well-known/ai-plugin.json`, plus a full OpenAPI 3.0 spec at `/api/openapi.json`. An agent hitting the domain cold can discover every available endpoint, parameter, and response shape without any human handing it documentation. This is how agent discovery actually works in practice- agents probe well-known paths and parse machine-readable specs.
+**Agents can find the API without being told about it.** The platform uses 5 redundant discovery layers: HTTP headers on every response (`X-API-Base`, `Link` with rel=agent-manifest), content negotiation on the root URL (Accept: application/json returns the discovery document instead of HTML), HTML meta tags, robots.txt hints, and standard `.well-known` manifests. An agent hitting the domain cold — from any entry point, using any discovery strategy — can find every available endpoint, parameter, and response shape without any human handing it documentation.
 
 **Zero authentication for all read operations.** No API keys, no OAuth, no signup, no cookies, no sessions. An agent can start querying listings, categories, chains, and tags immediately. The only endpoints that require auth are admin operations, which agents don't need.
 

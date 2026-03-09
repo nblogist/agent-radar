@@ -18,8 +18,9 @@ RUN mkdir -p dist/.well-known && \
     "$VITE_API_BASE_URL" "$VITE_API_BASE_URL" "$VITE_API_BASE_URL" > dist/.well-known/ai-plugin.json
 
 # ── Runtime stage ─────────────────────────────────────────────────────────────
-FROM node:20-alpine
-RUN npm install -g serve
+FROM nginx:alpine
 COPY --from=builder /app/dist /app
+COPY nginx.conf.template /etc/nginx/templates/default.conf.template
+ENV PORT=3000
 EXPOSE 3000
-CMD ["serve", "-s", "/app", "-l", "3000"]
+CMD ["sh", "-c", "envsubst '${PORT}' < /etc/nginx/templates/default.conf.template > /etc/nginx/conf.d/default.conf && nginx -g 'daemon off;'"]

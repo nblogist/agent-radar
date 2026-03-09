@@ -15,7 +15,8 @@ See [PROJECT_OVERVIEW.md](PROJECT_OVERVIEW.md) for a detailed feature overview a
 - **Admin auth**: Single Bearer token (`ADMIN_TOKEN` env var), no rate limit on admin endpoints
 - **Rate limiting**: In-memory via `governor` crate (60/min reads, 30/hr submissions)
 - **CORS**: Open to all origins (`*`) by design
-- **Agent discovery**: `/.well-known/agent.json`, `/.well-known/ai-plugin.json`, `/api/openapi.json`
+- **Agent discovery**: 5-layer discovery (HTTP headers, content negotiation, HTML meta, robots.txt, .well-known manifests)
+- **Frontend server**: nginx with content negotiation (agents get JSON, browsers get SPA)
 
 ## Prerequisites
 
@@ -137,11 +138,20 @@ Full interactive documentation is available at `/api-docs` in the running applic
 
 ### Agent Discovery (no auth)
 
+AgentRadar uses a 5-layer discovery approach so AI agents can find the API from any entry point:
+
+1. **HTTP headers** — Every response (frontend and backend) includes `X-API-Base: /api` and `Link` headers pointing to the agent manifest and OpenAPI spec (RFC 8288).
+2. **Content negotiation** — `Accept: application/json` on the frontend root URL returns `agent.json` instead of HTML. Browsers always send `Accept: text/html,...` so they're unaffected.
+3. **HTML meta tags** — `<meta name="api-base">` and `<link rel="agent-manifest">` in `index.html` for agents that parse HTML.
+4. **robots.txt** — Comments listing all discovery paths (`/api/openapi.json`, `/.well-known/agent.json`, etc.).
+5. **.well-known manifests** — Standard discovery files served as JSON (not SPA fallback).
+
 | Method | Path | Description |
 |--------|------|-------------|
 | `GET` | `/.well-known/agent.json` | Agent capabilities manifest- lists all operations, params, rate limits |
 | `GET` | `/.well-known/ai-plugin.json` | AI plugin manifest (ChatGPT plugin format) |
 | `GET` | `/api/openapi.json` | Full OpenAPI 3.0 specification |
+| `GET` | `/` (backend) | JSON discovery document with all endpoint URLs |
 
 ### Public Endpoints (no auth)
 
