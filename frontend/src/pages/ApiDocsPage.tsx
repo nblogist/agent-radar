@@ -140,6 +140,7 @@ export default function ApiDocsPage() {
               { name: 'sort', type: 'string', desc: '"newest" (default), "views", or "alpha"' },
               { name: 'page', type: 'number', desc: 'Page number (default: 1)' },
               { name: 'per_page', type: 'number', desc: 'Items per page (default: 20, max: 100)' },
+              { name: 'format', type: 'string', desc: '"agent" — minimal response for AI agents (drops logo, dates, view counts)' },
             ]}
             response={`{
   "data": [

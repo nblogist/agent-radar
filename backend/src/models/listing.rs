@@ -123,3 +123,52 @@ pub struct ChainRef {
     pub slug: String,
     pub is_featured: bool,
 }
+
+/// Minimal listing for agent consumers (?format=agent).
+/// Drops visual, editorial, and timestamp fields that add cost without value for agents.
+#[derive(Debug, Serialize)]
+pub struct AgentListing {
+    pub name: String,
+    pub slug: String,
+    pub description: String,
+    pub website_url: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub github_url: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub docs_url: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub api_endpoint_url: Option<String>,
+    pub categories: Vec<String>,
+    pub tags: Vec<String>,
+}
+
+impl From<PublicListing> for AgentListing {
+    fn from(l: PublicListing) -> Self {
+        Self {
+            name: l.name,
+            slug: l.slug,
+            description: l.description,
+            website_url: l.website_url,
+            github_url: l.github_url,
+            docs_url: l.docs_url,
+            api_endpoint_url: l.api_endpoint_url,
+            categories: l.categories.into_iter().map(|c| c.slug).collect(),
+            tags: l.tags.into_iter().map(|t| t.slug).collect(),
+        }
+    }
+}
+
+/// Paginated response for agent format.
+#[derive(Debug, Serialize)]
+pub struct AgentPaginatedResponse {
+    pub data: Vec<AgentListing>,
+    pub meta: AgentPaginationMeta,
+}
+
+#[derive(Debug, Serialize)]
+pub struct AgentPaginationMeta {
+    pub page: i64,
+    pub total: i64,
+    pub total_pages: i64,
+    pub has_next: bool,
+}

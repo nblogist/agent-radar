@@ -29,7 +29,17 @@ All read endpoints are public (no auth required). Responses are JSON with consis
 - Read endpoints: 60 requests/minute per IP
 - Submit endpoint: 30 requests/hour per IP
 
+## Agent-Optimized Responses
+
+Append ?format=agent to listing endpoints for minimal JSON:
+- GET /api/listings?format=agent
+- GET /api/listings/:slug?format=agent
+
+Drops: id, logo_url, short_description, reputation_score, is_featured, view_count, timestamps, chains.
+Keeps: name, slug, description, website_url, github_url, docs_url, api_endpoint_url, categories (slugs), tags (slugs).
+
 ## Response Format
 
-Paginated: { "data": [...], "meta": { "page", "per_page", "total", "total_pages" } }
+Default: { "data": [...], "meta": { "page", "per_page", "total", "total_pages" } }
+Agent: { "data": [...], "meta": { "page", "total", "total_pages", "has_next" } }
 Errors: { "error": "message", "code": "ERROR_CODE" }

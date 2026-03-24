@@ -130,6 +130,13 @@
             "in": "query",
             "description": "Results per page (1-100, default 20)",
             "schema": { "type": "integer", "minimum": 1, "maximum": 100, "default": 20 }
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "description": "Response format. Use 'agent' for minimal JSON optimized for AI agents — drops logo, dates, view counts, and returns categories/tags as slug arrays instead of full objects.",
+            "schema": { "type": "string", "enum": ["agent"] },
+            "example": "agent"
           }
         ],
         "responses": {
@@ -225,6 +232,12 @@
               "by_slug": { "value": "dify" },
               "by_uuid": { "value": "0961bb81-32c8-4734-b2d2-6895f2fcbe47" }
             }
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "description": "Response format. Use 'agent' for minimal JSON optimized for AI agents.",
+            "schema": { "type": "string", "enum": ["agent"] }
           }
         ],
         "responses": {
@@ -536,6 +549,21 @@
           "name": { "type": "string" },
           "slug": { "type": "string" },
           "is_featured": { "type": "boolean" }
+        }
+      },
+      "AgentListing": {
+        "type": "object",
+        "description": "Minimal listing for AI agent consumers. Use ?format=agent to get this shape. Drops visual (logo), editorial (featured, view_count), and timestamp fields.",
+        "properties": {
+          "name": { "type": "string" },
+          "slug": { "type": "string", "description": "Use in /api/listings/{slug} for detail" },
+          "description": { "type": "string", "description": "Full description (Markdown)" },
+          "website_url": { "type": "string", "format": "uri" },
+          "github_url": { "type": "string", "nullable": true },
+          "docs_url": { "type": "string", "nullable": true },
+          "api_endpoint_url": { "type": "string", "nullable": true },
+          "categories": { "type": "array", "items": { "type": "string" }, "description": "Category slugs" },
+          "tags": { "type": "array", "items": { "type": "string" }, "description": "Tag slugs" }
         }
       },
       "ErrorResponse": {

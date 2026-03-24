@@ -11,7 +11,7 @@ use crate::errors::{AppError, ErrorBody, FieldError};
 use crate::guards::admin_token::AdminToken;
 use crate::guards::rate_limit::ReadRateLimit;
 use crate::guards::rate_limit::SubmitRateLimit;
-use crate::models::listing::{CategoryRef, ChainRef, Listing, NewListing, PublicListing, TagRef};
+use crate::models::listing::{AgentListing, AgentPaginatedResponse, AgentPaginationMeta, CategoryRef, ChainRef, Listing, NewListing, PublicListing, TagRef};
 
 // ---------------------------------------------------------------------------
 // Pagination helpers
@@ -47,6 +47,8 @@ pub struct ListingsQuery<'r> {
     pub page: Option<i64>,
     pub per_page: Option<i64>,
     pub featured: Option<bool>,
+    /// Use "agent" for minimal response (drops visual/editorial/timestamp fields).
+    pub format: Option<&'r str>,
 }
 
 // ---------------------------------------------------------------------------
@@ -240,7 +242,8 @@ pub async fn list_listings(
     pool: &State<DbPool>,
     query: ListingsQuery<'_>,
     _rl: ReadRateLimit,
-) -> Result<Json<PaginatedResponse<PublicListing>>, Custom<Json<ErrorBody>>> {
+) -> Result<Json<serde_json::Value>, Custom<Json<ErrorBody>>> {
+    let is_agent_format = query.format.as_deref() == Some("agent");
     let page = query.page.unwrap_or(1).max(1);
     let per_page = query.per_page.unwrap_or(20).min(100).max(1);
     let offset = (page - 1) * per_page;
@@ -406,29 +409,43 @@ pub async fn list_listings(
         0
     };
 
-    Ok(Json(PaginatedResponse {
-        data,
-        meta: PaginationMeta {
-            page,
-            per_page,
-            total,
-            total_pages,
-            has_next: page < total_pages,
-            has_previous: page > 1,
-        },
-    }))
+    if is_agent_format {
+        let agent_data: Vec<AgentListing> = data.into_iter().map(Into::into).collect();
+        Ok(Json(serde_json::to_value(AgentPaginatedResponse {
+            data: agent_data,
+            meta: AgentPaginationMeta {
+                page,
+                total,
+                total_pages,
+                has_next: page < total_pages,
+            },
+        }).unwrap()))
+    } else {
+        Ok(Json(serde_json::to_value(PaginatedResponse {
+            data,
+            meta: PaginationMeta {
+                page,
+                per_page,
+                total,
+                total_pages,
+                has_next: page < total_pages,
+                has_previous: page > 1,
+            },
+        }).unwrap()))
+    }
 }
 
 // ---------------------------------------------------------------------------
 // GET /api/listings/<slug_or_id> -- detail with atomic view increment
 // ---------------------------------------------------------------------------
 
-#[get("/listings/<slug_or_id>")]
+#[get("/listings/<slug_or_id>?<format>")]
 pub async fn get_listing(
     pool: &State<DbPool>,
     slug_or_id: &str,
+    format: Option<&str>,
     _rl: ReadRateLimit,
-) -> Result<Json<PublicListing>, Custom<Json<ErrorBody>>> {
+) -> Result<Json<serde_json::Value>, Custom<Json<ErrorBody>>> {
     // Reject inputs containing null bytes (PostgreSQL can't handle them)
     if slug_or_id.contains('\0') {
         return Err(AppError::NotFound.into_response());
@@ -469,7 +486,12 @@ pub async fn get_listing(
             let pl = build_public_listing(pool.inner(), listing)
                 .await
                 .map_err(|e| AppError::Db(e).into_response())?;
-            Ok(Json(pl))
+            if format == Some("agent") {
+                let al: AgentListing = pl.into();
+                Ok(Json(serde_json::to_value(al).unwrap()))
+            } else {
+                Ok(Json(serde_json::to_value(pl).unwrap()))
+            }
         }
     }
 }
