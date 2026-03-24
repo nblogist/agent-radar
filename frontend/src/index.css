@@ -2,7 +2,7 @@
 @plugin "@tailwindcss/typography";
 
 @theme {
-  --color-primary: #3713ec;
+  --color-primary: var(--theme-primary);
   --color-accent: var(--theme-accent);
   --color-dark-bg: var(--theme-bg);
   --color-dark-surface: var(--theme-surface);
@@ -29,6 +29,7 @@
   --theme-text: #f1f5f9;
   --theme-text-secondary: #cbd5e1;
   --theme-text-muted: #94a3b8;
+  --theme-primary: #6d5cff;
   --theme-accent: #00f2ff;
   --theme-code: #f59e0b;
   color-scheme: dark;
@@ -43,6 +44,7 @@
   --theme-text: #0f172a;
   --theme-text-secondary: #475569;
   --theme-text-muted: #64748b;
+  --theme-primary: #3713ec;
   --theme-accent: #0e7490;
   --theme-code: #9333ea;
   color-scheme: light;
