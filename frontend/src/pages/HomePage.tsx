@@ -118,18 +118,21 @@ export default function HomePage() {
           <div>
             <h2 className="text-3xl font-bold mb-2">Top Listings</h2>
             <p className="text-theme-text-muted">The most viewed tools and services in the directory.</p>
+            {listingsRes?.meta?.total != null && (
+              <p className="text-theme-text-muted text-sm mt-1">Showing top {topListings.length} of {listingsRes.meta.total} listings</p>
+            )}
           </div>
         </div>
 
         <div className="w-full overflow-x-auto rounded-xl border border-primary/20 bg-dark-surface shadow-xl">
-          <table className="w-full text-left border-collapse min-w-[640px]">
+          <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-primary/5 border-b border-primary/20">
-                <th className="px-4 sm:px-6 py-4 text-xs font-bold text-theme-text-muted uppercase tracking-wider">#</th>
+                <th className="hidden sm:table-cell px-4 sm:px-6 py-4 text-xs font-bold text-theme-text-muted uppercase tracking-wider">#</th>
                 <th className="px-4 sm:px-6 py-4 text-xs font-bold text-theme-text-muted uppercase tracking-wider">Tool</th>
-                <th className="px-4 sm:px-6 py-4 text-xs font-bold text-theme-text-muted uppercase tracking-wider">Category</th>
-                <th className="px-4 sm:px-6 py-4 text-xs font-bold text-theme-text-muted uppercase tracking-wider">Views</th>
-                <th className="px-4 sm:px-6 py-4 text-xs font-bold text-theme-text-muted uppercase tracking-wider">Reputation</th>
+                <th className="hidden sm:table-cell px-4 sm:px-6 py-4 text-xs font-bold text-theme-text-muted uppercase tracking-wider">Category</th>
+                <th className="hidden md:table-cell px-4 sm:px-6 py-4 text-xs font-bold text-theme-text-muted uppercase tracking-wider">Views</th>
+                <th className="hidden md:table-cell px-4 sm:px-6 py-4 text-xs font-bold text-theme-text-muted uppercase tracking-wider">Reputation</th>
                 <th className="px-4 sm:px-6 py-4 text-xs font-bold text-theme-text-muted uppercase tracking-wider text-right">Action</th>
               </tr>
             </thead>
@@ -137,19 +140,19 @@ export default function HomePage() {
               {listingsLoading ? (
                 Array.from({ length: 4 }).map((_, i) => (
                   <tr key={i} className="animate-pulse">
-                    <td className="px-4 sm:px-6 py-5"><div className="h-4 w-6 bg-dark-surface2 rounded" /></td>
+                    <td className="hidden sm:table-cell px-4 sm:px-6 py-5"><div className="h-4 w-6 bg-dark-surface2 rounded" /></td>
                     <td className="px-4 sm:px-6 py-5">
-                      <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 rounded-lg bg-dark-surface2" />
+                      <div className="flex items-center gap-3 sm:gap-4">
+                        <div className="size-10 sm:size-12 rounded-lg bg-dark-surface2 shrink-0" />
                         <div className="space-y-2">
                           <div className="h-4 w-32 bg-dark-surface2 rounded" />
                           <div className="h-3 w-20 bg-dark-surface2/60 rounded" />
                         </div>
                       </div>
                     </td>
-                    <td className="px-4 sm:px-6 py-5"><div className="h-4 w-20 bg-dark-surface2 rounded" /></td>
-                    <td className="px-4 sm:px-6 py-5"><div className="h-4 w-12 bg-dark-surface2 rounded" /></td>
-                    <td className="px-4 sm:px-6 py-5"><div className="h-4 w-10 bg-dark-surface2 rounded" /></td>
+                    <td className="hidden sm:table-cell px-4 sm:px-6 py-5"><div className="h-4 w-20 bg-dark-surface2 rounded" /></td>
+                    <td className="hidden md:table-cell px-4 sm:px-6 py-5"><div className="h-4 w-12 bg-dark-surface2 rounded" /></td>
+                    <td className="hidden md:table-cell px-4 sm:px-6 py-5"><div className="h-4 w-10 bg-dark-surface2 rounded" /></td>
                     <td className="px-4 sm:px-6 py-5"><div className="h-4 w-6 bg-dark-surface2 rounded ml-auto" /></td>
                   </tr>
                 ))
@@ -170,15 +173,15 @@ export default function HomePage() {
                       className="hover:bg-primary/5 transition-colors cursor-pointer group"
                       onClick={() => navigate(`/listings/${listing.slug}`)}
                     >
-                      <td className="px-4 sm:px-6 py-5 font-bold text-theme-text-muted">{idx + 1}</td>
+                      <td className="hidden sm:table-cell px-4 sm:px-6 py-5 font-bold text-theme-text-muted">{idx + 1}</td>
                       <td className="px-4 sm:px-6 py-5">
-                        <div className="flex items-center gap-4">
-                          <ListingLogo name={listing.name} logoUrl={listing.logo_url} size="size-14" textSize="text-lg" />
-                          <div>
-                            <div className="font-bold text-lg group-hover:text-primary transition-colors text-theme-text flex items-center gap-2">
-                              {listing.name}
+                        <div className="flex items-center gap-3 sm:gap-4">
+                          <ListingLogo name={listing.name} logoUrl={listing.logo_url} size="size-10 sm:size-14" textSize="text-sm sm:text-lg" />
+                          <div className="min-w-0">
+                            <div className="font-bold text-base sm:text-lg group-hover:text-primary transition-colors text-theme-text flex items-center gap-2">
+                              <span className="truncate">{listing.name}</span>
                               {listing.is_featured && (
-                                <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-500 text-[10px] font-bold">
+                                <span className="hidden sm:inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-500 text-[10px] font-bold shrink-0">
                                   <span className="material-symbols-outlined text-xs">star</span> Featured
                                 </span>
                               )}
@@ -189,7 +192,7 @@ export default function HomePage() {
                           </div>
                         </div>
                       </td>
-                      <td className="px-4 sm:px-6 py-5">
+                      <td className="hidden sm:table-cell px-4 sm:px-6 py-5">
                         {primaryCat ? (
                           <span className={`${catColor.bg} ${catColor.text} text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded`}>
                             {primaryCat.name}
@@ -198,12 +201,12 @@ export default function HomePage() {
                           <span className="text-theme-text-muted text-sm">-</span>
                         )}
                       </td>
-                      <td className="px-4 sm:px-6 py-5 font-medium text-theme-text">
+                      <td className="hidden md:table-cell px-4 sm:px-6 py-5 font-medium text-theme-text">
                         {listing.view_count >= 1000
                           ? `${(listing.view_count / 1000).toFixed(1)}k`
                           : listing.view_count}
                       </td>
-                      <td className="px-4 sm:px-6 py-5">
+                      <td className="hidden md:table-cell px-4 sm:px-6 py-5">
                         {listing.reputation_score != null ? (
                           <span className="text-primary text-sm font-medium">{listing.reputation_score}</span>
                         ) : (
@@ -213,7 +216,7 @@ export default function HomePage() {
                       <td className="px-4 sm:px-6 py-5 text-right">
                         <Link
                           to={`/listings/${listing.slug}`}
-                          className="text-theme-text-muted hover:text-primary transition-colors"
+                          className="inline-flex items-center justify-center w-10 h-10 rounded-lg text-theme-text-muted hover:text-primary hover:bg-primary/10 transition-colors"
                           onClick={e => e.stopPropagation()}
                         >
                           <span className="material-symbols-outlined">arrow_forward</span>
@@ -246,7 +249,7 @@ export default function HomePage() {
           <div className="flex-1 text-center md:text-left">
             <h3 className="text-xl font-bold mb-2">Built for Autonomous Agents</h3>
             <p className="text-theme-text-muted text-sm max-w-xl">
-              Every action available via REST API. Agents can discover, filter, submit, and retrieve listings programmatically -- no browser required.
+              Every action available via REST API. Agents can discover, filter, submit, and retrieve listings programmatically, no browser required.
             </p>
           </div>
           <Link

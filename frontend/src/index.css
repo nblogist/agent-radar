@@ -3,7 +3,7 @@
 
 @theme {
   --color-primary: #3713ec;
-  --color-accent: #00f2ff;
+  --color-accent: var(--theme-accent);
   --color-dark-bg: var(--theme-bg);
   --color-dark-surface: var(--theme-surface);
   --color-dark-surface2: var(--theme-surface2);
@@ -28,6 +28,7 @@
   --theme-text: #f1f5f9;
   --theme-text-secondary: #cbd5e1;
   --theme-text-muted: #94a3b8;
+  --theme-accent: #00f2ff;
   color-scheme: dark;
 }
 
@@ -40,6 +41,7 @@
   --theme-text: #0f172a;
   --theme-text-secondary: #475569;
   --theme-text-muted: #64748b;
+  --theme-accent: #0e7490;
   color-scheme: light;
 }
 

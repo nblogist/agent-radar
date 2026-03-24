@@ -15,9 +15,9 @@ function Endpoint({ method, path, description, params, body, response, rateLimit
   rateLimit?: string;
 }) {
   const methodColors: Record<string, string> = {
-    GET: 'bg-emerald-500/10 text-emerald-400',
-    POST: 'bg-blue-500/10 text-blue-400',
-    PATCH: 'bg-amber-500/10 text-amber-400',
+    GET: 'bg-emerald-500/20 text-emerald-400 ring-1 ring-emerald-500/30',
+    POST: 'bg-blue-500/20 text-blue-400 ring-1 ring-blue-500/30',
+    PATCH: 'bg-amber-500/20 text-amber-400 ring-1 ring-amber-500/30',
   };
 
   return (
@@ -32,16 +32,16 @@ function Endpoint({ method, path, description, params, body, response, rateLimit
         )}
       </div>
       <div className="px-6 py-4 space-y-4">
-        <p className="text-sm text-theme-text-secondary">{description}</p>
+        <p className="text-sm text-theme-text">{description}</p>
 
         {params && params.length > 0 && (
           <div>
-            <h5 className="text-xs font-bold text-theme-text-muted uppercase tracking-wider mb-2">Query Parameters</h5>
-            <div className="space-y-1">
+            <h5 className="text-xs font-bold text-theme-text-secondary uppercase tracking-wider mb-3">Query Parameters</h5>
+            <div className="space-y-2">
               {params.map(p => (
-                <div key={p.name} className="flex gap-3 text-sm">
-                  <code className="text-primary font-mono text-xs shrink-0">{p.name}</code>
-                  <span className="text-theme-text-muted text-xs shrink-0">({p.type})</span>
+                <div key={p.name} className="flex flex-wrap items-baseline gap-2 text-sm">
+                  <code className="text-accent font-mono text-xs font-bold shrink-0">{p.name}</code>
+                  <span className="text-xs px-1.5 py-0.5 rounded bg-dark-surface2 text-theme-text-secondary font-mono shrink-0">{p.type}</span>
                   <span className="text-theme-text-secondary text-xs">{p.desc}</span>
                 </div>
               ))}
@@ -51,14 +51,14 @@ function Endpoint({ method, path, description, params, body, response, rateLimit
 
         {body && (
           <div>
-            <h5 className="text-xs font-bold text-theme-text-muted uppercase tracking-wider mb-2">Request Body</h5>
-            <pre className="bg-dark-surface2 rounded-lg p-4 text-xs text-theme-text-secondary font-mono overflow-x-auto">{body}</pre>
+            <h5 className="text-xs font-bold text-theme-text-secondary uppercase tracking-wider mb-2">Request Body</h5>
+            <pre className="bg-dark-surface2 rounded-lg p-4 text-xs text-theme-text font-mono overflow-x-auto">{body}</pre>
           </div>
         )}
 
         <div>
-          <h5 className="text-xs font-bold text-theme-text-muted uppercase tracking-wider mb-2">Response</h5>
-          <pre className="bg-dark-surface2 rounded-lg p-4 text-xs text-theme-text-secondary font-mono overflow-x-auto">{response}</pre>
+          <h5 className="text-xs font-bold text-theme-text-secondary uppercase tracking-wider mb-2">Response</h5>
+          <pre className="bg-dark-surface2 rounded-lg p-4 text-xs text-theme-text font-mono overflow-x-auto">{response}</pre>
         </div>
       </div>
     </div>
@@ -115,9 +115,9 @@ export default function ApiDocsPage() {
             All API endpoints support Cross-Origin Resource Sharing (CORS) with permissive defaults for agent-first access.
           </p>
           <div className="space-y-2 text-sm">
-            <div className="flex gap-4"><code className="text-primary font-mono text-xs shrink-0">Access-Control-Allow-Origin</code><span className="text-theme-text-secondary">*</span></div>
-            <div className="flex gap-4"><code className="text-primary font-mono text-xs shrink-0">Access-Control-Allow-Methods</code><span className="text-theme-text-secondary">GET, POST, PATCH, DELETE, OPTIONS</span></div>
-            <div className="flex gap-4"><code className="text-primary font-mono text-xs shrink-0">Access-Control-Allow-Headers</code><span className="text-theme-text-secondary">Content-Type, Authorization</span></div>
+            <div className="flex gap-4"><code className="text-accent font-mono text-xs font-bold shrink-0">Access-Control-Allow-Origin</code><span className="text-theme-text">*</span></div>
+            <div className="flex gap-4"><code className="text-accent font-mono text-xs font-bold shrink-0">Access-Control-Allow-Methods</code><span className="text-theme-text">GET, POST, PATCH, DELETE, OPTIONS</span></div>
+            <div className="flex gap-4"><code className="text-accent font-mono text-xs font-bold shrink-0">Access-Control-Allow-Headers</code><span className="text-theme-text">Content-Type, Authorization</span></div>
           </div>
           <p className="text-xs text-theme-text-muted mt-4">Browser-based agents and cross-origin API consumers can call all endpoints without proxy configuration.</p>
         </div>
@@ -342,16 +342,16 @@ export default function ApiDocsPage() {
         </p>
         <div className="space-y-4">
           <div className="bg-dark-surface border border-dark-border rounded-xl p-5 flex flex-col sm:flex-row sm:items-center gap-3">
-            <code className="text-primary font-mono text-sm shrink-0">/.well-known/agent.json</code>
-            <span className="text-theme-text-secondary text-sm">Agent capabilities manifest. Lists every operation, parameters, rate limits, and auth requirements.</span>
+            <code className="text-accent font-mono text-sm font-bold shrink-0">/.well-known/agent.json</code>
+            <span className="text-theme-text text-sm">Agent capabilities manifest. Lists every operation, parameters, rate limits, and auth requirements.</span>
           </div>
           <div className="bg-dark-surface border border-dark-border rounded-xl p-5 flex flex-col sm:flex-row sm:items-center gap-3">
-            <code className="text-primary font-mono text-sm shrink-0">/.well-known/ai-plugin.json</code>
-            <span className="text-theme-text-secondary text-sm">AI plugin manifest (ChatGPT plugin format) for agents that probe this standard path.</span>
+            <code className="text-accent font-mono text-sm font-bold shrink-0">/.well-known/ai-plugin.json</code>
+            <span className="text-theme-text text-sm">AI plugin manifest (ChatGPT plugin format) for agents that probe this standard path.</span>
           </div>
           <div className="bg-dark-surface border border-dark-border rounded-xl p-5 flex flex-col sm:flex-row sm:items-center gap-3">
-            <code className="text-primary font-mono text-sm shrink-0">/api/openapi.json</code>
-            <span className="text-theme-text-secondary text-sm">Full OpenAPI 3.0 spec. Any agent or tool that speaks OpenAPI can auto-generate a client from this.</span>
+            <code className="text-accent font-mono text-sm font-bold shrink-0">/api/openapi.json</code>
+            <span className="text-theme-text text-sm">Full OpenAPI 3.0 spec. Any agent or tool that speaks OpenAPI can auto-generate a client from this.</span>
           </div>
         </div>
       </section>
