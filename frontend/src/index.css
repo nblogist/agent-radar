@@ -12,6 +12,7 @@
   --color-theme-text-secondary: var(--theme-text-secondary);
   --color-theme-text-muted: var(--theme-text-muted);
   --color-on-accent: #0f172a;
+  --color-code: var(--theme-code);
   --font-sans: 'Space Grotesk', sans-serif;
   --radius-sm: 0.25rem;
   --radius-lg: 0.5rem;
@@ -29,6 +30,7 @@
   --theme-text-secondary: #cbd5e1;
   --theme-text-muted: #94a3b8;
   --theme-accent: #00f2ff;
+  --theme-code: #f59e0b;
   color-scheme: dark;
 }
 
@@ -42,6 +44,7 @@
   --theme-text-secondary: #475569;
   --theme-text-muted: #64748b;
   --theme-accent: #0e7490;
+  --theme-code: #9333ea;
   color-scheme: light;
 }
 
