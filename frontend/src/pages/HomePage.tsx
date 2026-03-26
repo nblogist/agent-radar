@@ -51,25 +51,8 @@ export default function HomePage() {
             Find, compare, and integrate AI agents, developer tools, and infrastructure. All in one place. Built for agents and the humans behind them.
           </p>
 
-          {/* Search bar */}
-          <form onSubmit={handleSearch} className="max-w-2xl mx-auto bg-dark-surface p-2 rounded-xl shadow-2xl border border-dark-border flex items-center gap-2">
-            <div className="flex-1 flex items-center px-4 gap-3">
-              <span className="material-symbols-outlined text-theme-text-muted">search</span>
-              <input
-                className="w-full bg-transparent border-none focus:ring-0 text-theme-text placeholder:text-theme-text-muted outline-none"
-                placeholder="Search tools, services, platforms..."
-                type="text"
-                value={searchTerm}
-                onChange={e => setSearchTerm(e.target.value)}
-              />
-            </div>
-            <button type="submit" className="bg-primary text-white px-6 sm:px-8 py-3 rounded-lg font-bold transition-all duration-300 ease-out hover:scale-[1.05] hover:shadow-[0_0_20px_rgba(55,19,236,0.4)] active:scale-95">
-              Explore
-            </button>
-          </form>
-
           {/* Human / Agent split */}
-          <div className="max-w-2xl mx-auto mt-8 space-y-3">
+          <div className="max-w-2xl mx-auto mb-8 space-y-3">
             <Link
               to="/browse"
               className="flex items-center gap-4 px-6 py-5 rounded-xl bg-dark-surface border border-dark-border transition-all duration-300 ease-out hover:scale-[1.02] hover:border-primary/40 hover:shadow-lg active:scale-[0.98] group"
@@ -96,6 +79,23 @@ export default function HomePage() {
               <span className="material-symbols-outlined text-white/70 group-hover:translate-x-1 group-hover:text-white transition-all">arrow_forward</span>
             </a>
           </div>
+
+          {/* Search bar */}
+          <form onSubmit={handleSearch} className="max-w-2xl mx-auto mt-8 bg-dark-surface p-2 rounded-xl shadow-2xl border border-dark-border flex items-center gap-2">
+            <div className="flex-1 flex items-center px-4 gap-3">
+              <span className="material-symbols-outlined text-theme-text-muted">search</span>
+              <input
+                className="w-full bg-transparent border-none focus:ring-0 text-theme-text placeholder:text-theme-text-muted outline-none"
+                placeholder="Search tools, services, platforms..."
+                type="text"
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+              />
+            </div>
+            <button type="submit" className="bg-primary text-white px-6 sm:px-8 py-3 rounded-lg font-bold transition-all duration-300 ease-out hover:scale-[1.05] hover:shadow-[0_0_20px_rgba(55,19,236,0.4)] active:scale-95">
+              Explore
+            </button>
+          </form>
 
           {/* Submit CTA */}
           <div className="flex items-center justify-center mt-6">
